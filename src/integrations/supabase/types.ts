@@ -14,16 +14,288 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      campus_zones: {
+        Row: {
+          center_lat: number
+          center_lon: number
+          created_at: string
+          id: string
+          name: string
+          radius_m: number
+          short_code: string | null
+        }
+        Insert: {
+          center_lat: number
+          center_lon: number
+          created_at?: string
+          id?: string
+          name: string
+          radius_m?: number
+          short_code?: string | null
+        }
+        Update: {
+          center_lat?: number
+          center_lon?: number
+          created_at?: string
+          id?: string
+          name?: string
+          radius_m?: number
+          short_code?: string | null
+        }
+        Relationships: []
+      }
+      location_events: {
+        Row: {
+          id: number
+          occurred_at: string
+          user_id: string
+          zone_id: string
+        }
+        Insert: {
+          id?: number
+          occurred_at?: string
+          user_id: string
+          zone_id: string
+        }
+        Update: {
+          id?: number
+          occurred_at?: string
+          user_id?: string
+          zone_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "location_events_zone_id_fkey"
+            columns: ["zone_id"]
+            isOneToOne: false
+            referencedRelation: "campus_zones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      posts: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          category: Database["public"]["Enums"]["post_category"]
+          created_at: string
+          description: string
+          id: string
+          location_label: string
+          reject_reason: string | null
+          status: Database["public"]["Enums"]["post_status"]
+          user_id: string
+          zone_id: string | null
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          category: Database["public"]["Enums"]["post_category"]
+          created_at?: string
+          description: string
+          id?: string
+          location_label: string
+          reject_reason?: string | null
+          status?: Database["public"]["Enums"]["post_status"]
+          user_id: string
+          zone_id?: string | null
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          category?: Database["public"]["Enums"]["post_category"]
+          created_at?: string
+          description?: string
+          id?: string
+          location_label?: string
+          reject_reason?: string | null
+          status?: Database["public"]["Enums"]["post_status"]
+          user_id?: string
+          zone_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "posts_zone_id_fkey"
+            columns: ["zone_id"]
+            isOneToOne: false
+            referencedRelation: "campus_zones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          display_name: string | null
+          email: string
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          display_name?: string | null
+          email: string
+          id: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string | null
+          email?: string
+          id?: string
+        }
+        Relationships: []
+      }
+      pulse_cards: {
+        Row: {
+          body: string
+          created_at: string
+          generated_for: string
+          id: string
+          kind: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          generated_for?: string
+          id?: string
+          kind: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          generated_for?: string
+          id?: string
+          kind?: string
+        }
+        Relationships: []
+      }
+      push_tokens: {
+        Row: {
+          expo_token: string
+          id: string
+          platform: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          expo_token: string
+          id?: string
+          platform?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          expo_token?: string
+          id?: string
+          platform?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      reactions: {
+        Row: {
+          created_at: string
+          post_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          post_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          post_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reactions_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      weekly_recaps: {
+        Row: {
+          created_at: string
+          crossed_paths: number
+          id: string
+          nearby_moments: number
+          positive_moments: number
+          top_zone: string | null
+          user_id: string
+          week_start: string
+          zones_visited: number
+        }
+        Insert: {
+          created_at?: string
+          crossed_paths?: number
+          id?: string
+          nearby_moments?: number
+          positive_moments?: number
+          top_zone?: string | null
+          user_id: string
+          week_start: string
+          zones_visited?: number
+        }
+        Update: {
+          created_at?: string
+          crossed_paths?: number
+          id?: string
+          nearby_moments?: number
+          positive_moments?: number
+          top_zone?: string | null
+          user_id?: string
+          week_start?: string
+          zones_visited?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "moderator" | "student"
+      post_category:
+        | "sports"
+        | "kindness"
+        | "academic"
+        | "food"
+        | "music"
+        | "social"
+        | "other"
+      post_status: "pending" | "approved" | "rejected"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +422,18 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "moderator", "student"],
+      post_category: [
+        "sports",
+        "kindness",
+        "academic",
+        "food",
+        "music",
+        "social",
+        "other",
+      ],
+      post_status: ["pending", "approved", "rejected"],
+    },
   },
 } as const
