@@ -1,29 +1,23 @@
-import { createFileRoute } from "@tanstack/react-router";
+// Public landing — redirect signed-in users into the app, signed-out users to /auth.
+import { createFileRoute, Navigate } from "@tanstack/react-router";
+import { useAuth } from "@/lib/use-auth";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Your App" },
-      { name: "description", content: "Replace this with a one-sentence description of your app." },
-      { property: "og:title", content: "Your App" },
-      { property: "og:description", content: "Replace this with a one-sentence description of your app." },
+      { title: "Campus Pulse" },
+      { name: "description", content: "A campus app that surfaces small positive community moments." },
     ],
   }),
-  component: Index,
+  component: Landing,
 });
 
-// IMPORTANT: Replace this placeholder. See ./README.md for routing conventions.
-function Index() {
-  return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
-      />
-    </div>
-  );
+function Landing() {
+  const { user, loading } = useAuth();
+  if (loading) return <div className="p-8 text-muted-foreground">Loading…</div>;
+  // _authenticated/index lives at "/" already — when authed, this won't render
+  // because TanStack matches the more specific _authenticated layout. We just
+  // bounce signed-out visitors to /auth.
+  if (!user) return <Navigate to="/auth" />;
+  return null;
 }

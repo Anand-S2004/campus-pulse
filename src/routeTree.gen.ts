@@ -10,33 +10,132 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiPublicRegisterPushTokenRouteImport } from './routes/api/public/register-push-token'
+import { Route as ApiPublicIngestLocationRouteImport } from './routes/api/public/ingest-location'
+import { Route as ApiPublicCronPushRecapsRouteImport } from './routes/api/public/cron/push-recaps'
+import { Route as ApiPublicCronNotifyApprovalsRouteImport } from './routes/api/public/cron/notify-approvals'
+import { Route as ApiPublicCronGenerateRecapRouteImport } from './routes/api/public/cron/generate-recap'
+import { Route as ApiPublicCronGeneratePulseRouteImport } from './routes/api/public/cron/generate-pulse'
+import { Route as ApiPublicAuthSignupRouteImport } from './routes/api/public/auth/signup'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicRegisterPushTokenRoute =
+  ApiPublicRegisterPushTokenRouteImport.update({
+    id: '/api/public/register-push-token',
+    path: '/api/public/register-push-token',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicIngestLocationRoute = ApiPublicIngestLocationRouteImport.update({
+  id: '/api/public/ingest-location',
+  path: '/api/public/ingest-location',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicCronPushRecapsRoute = ApiPublicCronPushRecapsRouteImport.update({
+  id: '/api/public/cron/push-recaps',
+  path: '/api/public/cron/push-recaps',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicCronNotifyApprovalsRoute =
+  ApiPublicCronNotifyApprovalsRouteImport.update({
+    id: '/api/public/cron/notify-approvals',
+    path: '/api/public/cron/notify-approvals',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicCronGenerateRecapRoute =
+  ApiPublicCronGenerateRecapRouteImport.update({
+    id: '/api/public/cron/generate-recap',
+    path: '/api/public/cron/generate-recap',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicCronGeneratePulseRoute =
+  ApiPublicCronGeneratePulseRouteImport.update({
+    id: '/api/public/cron/generate-pulse',
+    path: '/api/public/cron/generate-pulse',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicAuthSignupRoute = ApiPublicAuthSignupRouteImport.update({
+  id: '/api/public/auth/signup',
+  path: '/api/public/auth/signup',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/api/public/ingest-location': typeof ApiPublicIngestLocationRoute
+  '/api/public/register-push-token': typeof ApiPublicRegisterPushTokenRoute
+  '/api/public/auth/signup': typeof ApiPublicAuthSignupRoute
+  '/api/public/cron/generate-pulse': typeof ApiPublicCronGeneratePulseRoute
+  '/api/public/cron/generate-recap': typeof ApiPublicCronGenerateRecapRoute
+  '/api/public/cron/notify-approvals': typeof ApiPublicCronNotifyApprovalsRoute
+  '/api/public/cron/push-recaps': typeof ApiPublicCronPushRecapsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/api/public/ingest-location': typeof ApiPublicIngestLocationRoute
+  '/api/public/register-push-token': typeof ApiPublicRegisterPushTokenRoute
+  '/api/public/auth/signup': typeof ApiPublicAuthSignupRoute
+  '/api/public/cron/generate-pulse': typeof ApiPublicCronGeneratePulseRoute
+  '/api/public/cron/generate-recap': typeof ApiPublicCronGenerateRecapRoute
+  '/api/public/cron/notify-approvals': typeof ApiPublicCronNotifyApprovalsRoute
+  '/api/public/cron/push-recaps': typeof ApiPublicCronPushRecapsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/api/public/ingest-location': typeof ApiPublicIngestLocationRoute
+  '/api/public/register-push-token': typeof ApiPublicRegisterPushTokenRoute
+  '/api/public/auth/signup': typeof ApiPublicAuthSignupRoute
+  '/api/public/cron/generate-pulse': typeof ApiPublicCronGeneratePulseRoute
+  '/api/public/cron/generate-recap': typeof ApiPublicCronGenerateRecapRoute
+  '/api/public/cron/notify-approvals': typeof ApiPublicCronNotifyApprovalsRoute
+  '/api/public/cron/push-recaps': typeof ApiPublicCronPushRecapsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/api/public/ingest-location'
+    | '/api/public/register-push-token'
+    | '/api/public/auth/signup'
+    | '/api/public/cron/generate-pulse'
+    | '/api/public/cron/generate-recap'
+    | '/api/public/cron/notify-approvals'
+    | '/api/public/cron/push-recaps'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/api/public/ingest-location'
+    | '/api/public/register-push-token'
+    | '/api/public/auth/signup'
+    | '/api/public/cron/generate-pulse'
+    | '/api/public/cron/generate-recap'
+    | '/api/public/cron/notify-approvals'
+    | '/api/public/cron/push-recaps'
+  id:
+    | '__root__'
+    | '/'
+    | '/api/public/ingest-location'
+    | '/api/public/register-push-token'
+    | '/api/public/auth/signup'
+    | '/api/public/cron/generate-pulse'
+    | '/api/public/cron/generate-recap'
+    | '/api/public/cron/notify-approvals'
+    | '/api/public/cron/push-recaps'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ApiPublicIngestLocationRoute: typeof ApiPublicIngestLocationRoute
+  ApiPublicRegisterPushTokenRoute: typeof ApiPublicRegisterPushTokenRoute
+  ApiPublicAuthSignupRoute: typeof ApiPublicAuthSignupRoute
+  ApiPublicCronGeneratePulseRoute: typeof ApiPublicCronGeneratePulseRoute
+  ApiPublicCronGenerateRecapRoute: typeof ApiPublicCronGenerateRecapRoute
+  ApiPublicCronNotifyApprovalsRoute: typeof ApiPublicCronNotifyApprovalsRoute
+  ApiPublicCronPushRecapsRoute: typeof ApiPublicCronPushRecapsRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +147,67 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/register-push-token': {
+      id: '/api/public/register-push-token'
+      path: '/api/public/register-push-token'
+      fullPath: '/api/public/register-push-token'
+      preLoaderRoute: typeof ApiPublicRegisterPushTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/ingest-location': {
+      id: '/api/public/ingest-location'
+      path: '/api/public/ingest-location'
+      fullPath: '/api/public/ingest-location'
+      preLoaderRoute: typeof ApiPublicIngestLocationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/cron/push-recaps': {
+      id: '/api/public/cron/push-recaps'
+      path: '/api/public/cron/push-recaps'
+      fullPath: '/api/public/cron/push-recaps'
+      preLoaderRoute: typeof ApiPublicCronPushRecapsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/cron/notify-approvals': {
+      id: '/api/public/cron/notify-approvals'
+      path: '/api/public/cron/notify-approvals'
+      fullPath: '/api/public/cron/notify-approvals'
+      preLoaderRoute: typeof ApiPublicCronNotifyApprovalsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/cron/generate-recap': {
+      id: '/api/public/cron/generate-recap'
+      path: '/api/public/cron/generate-recap'
+      fullPath: '/api/public/cron/generate-recap'
+      preLoaderRoute: typeof ApiPublicCronGenerateRecapRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/cron/generate-pulse': {
+      id: '/api/public/cron/generate-pulse'
+      path: '/api/public/cron/generate-pulse'
+      fullPath: '/api/public/cron/generate-pulse'
+      preLoaderRoute: typeof ApiPublicCronGeneratePulseRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/auth/signup': {
+      id: '/api/public/auth/signup'
+      path: '/api/public/auth/signup'
+      fullPath: '/api/public/auth/signup'
+      preLoaderRoute: typeof ApiPublicAuthSignupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ApiPublicIngestLocationRoute: ApiPublicIngestLocationRoute,
+  ApiPublicRegisterPushTokenRoute: ApiPublicRegisterPushTokenRoute,
+  ApiPublicAuthSignupRoute: ApiPublicAuthSignupRoute,
+  ApiPublicCronGeneratePulseRoute: ApiPublicCronGeneratePulseRoute,
+  ApiPublicCronGenerateRecapRoute: ApiPublicCronGenerateRecapRoute,
+  ApiPublicCronNotifyApprovalsRoute: ApiPublicCronNotifyApprovalsRoute,
+  ApiPublicCronPushRecapsRoute: ApiPublicCronPushRecapsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
