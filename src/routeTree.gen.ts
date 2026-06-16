@@ -9,7 +9,12 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthRouteImport } from './routes/auth'
+import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
+import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
+import { Route as AuthenticatedZonesRouteImport } from './routes/_authenticated/zones'
+import { Route as AuthenticatedRecapRouteImport } from './routes/_authenticated/recap'
+import { Route as AuthenticatedModerateRouteImport } from './routes/_authenticated/moderate'
 import { Route as ApiPublicRegisterPushTokenRouteImport } from './routes/api/public/register-push-token'
 import { Route as ApiPublicIngestLocationRouteImport } from './routes/api/public/ingest-location'
 import { Route as ApiPublicCronPushRecapsRouteImport } from './routes/api/public/cron/push-recaps'
@@ -18,10 +23,34 @@ import { Route as ApiPublicCronGenerateRecapRouteImport } from './routes/api/pub
 import { Route as ApiPublicCronGeneratePulseRouteImport } from './routes/api/public/cron/generate-pulse'
 import { Route as ApiPublicAuthSignupRouteImport } from './routes/api/public/auth/signup'
 
-const IndexRoute = IndexRouteImport.update({
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
+  id: '/_authenticated',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedZonesRoute = AuthenticatedZonesRouteImport.update({
+  id: '/zones',
+  path: '/zones',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedRecapRoute = AuthenticatedRecapRouteImport.update({
+  id: '/recap',
+  path: '/recap',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedModerateRoute = AuthenticatedModerateRouteImport.update({
+  id: '/moderate',
+  path: '/moderate',
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const ApiPublicRegisterPushTokenRoute =
   ApiPublicRegisterPushTokenRouteImport.update({
@@ -64,7 +93,11 @@ const ApiPublicAuthSignupRoute = ApiPublicAuthSignupRouteImport.update({
 } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
+  '/': typeof AuthenticatedIndexRoute
+  '/auth': typeof AuthRoute
+  '/moderate': typeof AuthenticatedModerateRoute
+  '/recap': typeof AuthenticatedRecapRoute
+  '/zones': typeof AuthenticatedZonesRoute
   '/api/public/ingest-location': typeof ApiPublicIngestLocationRoute
   '/api/public/register-push-token': typeof ApiPublicRegisterPushTokenRoute
   '/api/public/auth/signup': typeof ApiPublicAuthSignupRoute
@@ -74,7 +107,11 @@ export interface FileRoutesByFullPath {
   '/api/public/cron/push-recaps': typeof ApiPublicCronPushRecapsRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
+  '/moderate': typeof AuthenticatedModerateRoute
+  '/recap': typeof AuthenticatedRecapRoute
+  '/zones': typeof AuthenticatedZonesRoute
+  '/': typeof AuthenticatedIndexRoute
   '/api/public/ingest-location': typeof ApiPublicIngestLocationRoute
   '/api/public/register-push-token': typeof ApiPublicRegisterPushTokenRoute
   '/api/public/auth/signup': typeof ApiPublicAuthSignupRoute
@@ -85,7 +122,12 @@ export interface FileRoutesByTo {
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
+  '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
+  '/auth': typeof AuthRoute
+  '/_authenticated/moderate': typeof AuthenticatedModerateRoute
+  '/_authenticated/recap': typeof AuthenticatedRecapRoute
+  '/_authenticated/zones': typeof AuthenticatedZonesRoute
+  '/_authenticated/': typeof AuthenticatedIndexRoute
   '/api/public/ingest-location': typeof ApiPublicIngestLocationRoute
   '/api/public/register-push-token': typeof ApiPublicRegisterPushTokenRoute
   '/api/public/auth/signup': typeof ApiPublicAuthSignupRoute
@@ -98,6 +140,10 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/auth'
+    | '/moderate'
+    | '/recap'
+    | '/zones'
     | '/api/public/ingest-location'
     | '/api/public/register-push-token'
     | '/api/public/auth/signup'
@@ -107,6 +153,10 @@ export interface FileRouteTypes {
     | '/api/public/cron/push-recaps'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/auth'
+    | '/moderate'
+    | '/recap'
+    | '/zones'
     | '/'
     | '/api/public/ingest-location'
     | '/api/public/register-push-token'
@@ -117,7 +167,12 @@ export interface FileRouteTypes {
     | '/api/public/cron/push-recaps'
   id:
     | '__root__'
-    | '/'
+    | '/_authenticated'
+    | '/auth'
+    | '/_authenticated/moderate'
+    | '/_authenticated/recap'
+    | '/_authenticated/zones'
+    | '/_authenticated/'
     | '/api/public/ingest-location'
     | '/api/public/register-push-token'
     | '/api/public/auth/signup'
@@ -128,7 +183,8 @@ export interface FileRouteTypes {
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
+  AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
+  AuthRoute: typeof AuthRoute
   ApiPublicIngestLocationRoute: typeof ApiPublicIngestLocationRoute
   ApiPublicRegisterPushTokenRoute: typeof ApiPublicRegisterPushTokenRoute
   ApiPublicAuthSignupRoute: typeof ApiPublicAuthSignupRoute
@@ -140,12 +196,47 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/': {
+      id: '/_authenticated/'
       path: '/'
       fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof AuthenticatedIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/zones': {
+      id: '/_authenticated/zones'
+      path: '/zones'
+      fullPath: '/zones'
+      preLoaderRoute: typeof AuthenticatedZonesRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/recap': {
+      id: '/_authenticated/recap'
+      path: '/recap'
+      fullPath: '/recap'
+      preLoaderRoute: typeof AuthenticatedRecapRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/moderate': {
+      id: '/_authenticated/moderate'
+      path: '/moderate'
+      fullPath: '/moderate'
+      preLoaderRoute: typeof AuthenticatedModerateRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/api/public/register-push-token': {
       id: '/api/public/register-push-token'
@@ -199,8 +290,26 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AuthenticatedRouteRouteChildren {
+  AuthenticatedModerateRoute: typeof AuthenticatedModerateRoute
+  AuthenticatedRecapRoute: typeof AuthenticatedRecapRoute
+  AuthenticatedZonesRoute: typeof AuthenticatedZonesRoute
+  AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
+}
+
+const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedModerateRoute: AuthenticatedModerateRoute,
+  AuthenticatedRecapRoute: AuthenticatedRecapRoute,
+  AuthenticatedZonesRoute: AuthenticatedZonesRoute,
+  AuthenticatedIndexRoute: AuthenticatedIndexRoute,
+}
+
+const AuthenticatedRouteRouteWithChildren =
+  AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
+  AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
+  AuthRoute: AuthRoute,
   ApiPublicIngestLocationRoute: ApiPublicIngestLocationRoute,
   ApiPublicRegisterPushTokenRoute: ApiPublicRegisterPushTokenRoute,
   ApiPublicAuthSignupRoute: ApiPublicAuthSignupRoute,
