@@ -1,4 +1,4 @@
-// /auth — sign-in / sign-up screen for the web admin (moderators, admins, staff).
+// /auth — sign-in / sign-up screen.
 // College email only. Signup hits the public API which enforces the domain server-side.
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
@@ -8,7 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
+import { CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({ meta: [{ title: "Sign in · Campus Pulse" }] }),
@@ -22,32 +24,65 @@ function AuthPage() {
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    setError(null);
+    setSuccess(null);
+
     if (!isCollegeEmail(email)) {
-      toast.error(`Use your @${COLLEGE_EMAIL_DOMAIN} email`);
+      const msg = `Please use your @${COLLEGE_EMAIL_DOMAIN} college email.`;
+      setError(msg);
+      toast.error(msg);
       return;
     }
+    if (password.length < 8) {
+      const msg = "Password must be at least 8 characters.";
+      setError(msg);
+      toast.error(msg);
+      return;
+    }
+
     setBusy(true);
     try {
       if (mode === "signup") {
-        // Server-side signup that enforces the domain & creates profile + role
+        if (!name.trim()) {
+          throw new Error("Please enter a display name.");
+        }
         const res = await fetch("/api/public/auth/signup", {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ email, password, display_name: name }),
         });
-        const j = await res.json();
-        if (!res.ok) throw new Error(j.error ?? "Signup failed");
-        // After signup, sign in normally
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(j.error ?? `Signup failed (${res.status})`);
+
+        setSuccess("Account created! Signing you in...");
+        toast.success("Account created successfully");
       }
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
-      toast.success("Welcome back");
-      nav({ to: "/" });
+
+      const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password });
+      if (signInErr) {
+        // Friendlier message for the most common case
+        if (signInErr.message.toLowerCase().includes("invalid")) {
+          throw new Error(
+            mode === "signin"
+              ? "Email or password is incorrect. If you haven't signed up yet, click 'Sign up' below."
+              : signInErr.message,
+          );
+        }
+        throw signInErr;
+      }
+
+      setSuccess("Signed in! Redirecting...");
+      toast.success(`Welcome${name ? `, ${name}` : ""}!`);
+      setTimeout(() => nav({ to: "/" }), 400);
     } catch (err) {
-      toast.error((err as Error).message);
+      const msg = (err as Error).message;
+      setError(msg);
+      toast.error(msg);
     } finally {
       setBusy(false);
     }
@@ -59,15 +94,36 @@ function AuthPage() {
         <CardHeader>
           <CardTitle className="text-2xl">Campus Pulse</CardTitle>
           <CardDescription>
-            {mode === "signin" ? "Sign in with your college email." : `Create an account (@${COLLEGE_EMAIL_DOMAIN} only).`}
+            {mode === "signin"
+              ? `Sign in with your @${COLLEGE_EMAIL_DOMAIN} email.`
+              : `Create an account (@${COLLEGE_EMAIL_DOMAIN} only).`}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={submit} className="space-y-4">
+            {error && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+            {success && (
+              <Alert className="border-green-500/50 text-green-700 dark:text-green-400">
+                <CheckCircle2 className="h-4 w-4" />
+                <AlertDescription>{success}</AlertDescription>
+              </Alert>
+            )}
+
             {mode === "signup" && (
               <div className="space-y-2">
                 <Label htmlFor="name">Display name</Label>
-                <Input id="name" value={name} onChange={(e) => setName(e.target.value)} required />
+                <Input
+                  id="name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Anu Sharma"
+                  required
+                />
               </div>
             )}
             <div className="space-y-2">
@@ -86,6 +142,7 @@ function AuthPage() {
               <Input
                 id="password"
                 type="password"
+                placeholder="At least 8 characters"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -93,14 +150,29 @@ function AuthPage() {
               />
             </div>
             <Button type="submit" className="w-full" disabled={busy}>
-              {busy ? "..." : mode === "signin" ? "Sign in" : "Create account"}
+              {busy ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {mode === "signin" ? "Signing in..." : "Creating account..."}
+                </>
+              ) : mode === "signin" ? (
+                "Sign in"
+              ) : (
+                "Create account"
+              )}
             </Button>
             <button
               type="button"
-              className="w-full text-center text-sm text-muted-foreground hover:underline"
-              onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
+              className="w-full text-center text-sm text-muted-foreground hover:text-foreground hover:underline"
+              onClick={() => {
+                setMode(mode === "signin" ? "signup" : "signin");
+                setError(null);
+                setSuccess(null);
+              }}
             >
-              {mode === "signin" ? "Need an account? Sign up" : "Have an account? Sign in"}
+              {mode === "signin"
+                ? "Don't have an account? Sign up →"
+                : "← Already have an account? Sign in"}
             </button>
           </form>
         </CardContent>
