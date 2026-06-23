@@ -1,5 +1,62 @@
 # Campus Pulse — What This Project Actually Is
 
+---
+
+## 🖥️ Local Development — Quick Start
+
+### Prerequisites
+- [Bun](https://bun.sh) — `curl -fsSL https://bun.sh/install | bash`
+- A Supabase project (the live one is already configured — just grab your keys)
+
+### 1. Clone & install
+```bash
+git clone https://github.com/Anand-S2004/campus-pulse.git
+cd campus-pulse
+bun install
+```
+
+### 2. Set up environment variables
+```bash
+cp .env.example .env
+```
+
+Open `.env` and fill in **all four values** from your Supabase dashboard  
+(**Settings → API**):
+
+| Variable | Where to find it |
+|---|---|
+| `SUPABASE_URL` / `VITE_SUPABASE_URL` | Settings → API → Project URL |
+| `SUPABASE_PUBLISHABLE_KEY` / `VITE_SUPABASE_PUBLISHABLE_KEY` | Settings → API → `anon` / `public` key |
+| `SUPABASE_SERVICE_ROLE_KEY` | Settings → API → `service_role` key ⚠️ keep secret |
+
+> **"Invalid API key" error?** The most common cause is a missing or wrong  
+> `SUPABASE_SERVICE_ROLE_KEY`. The signup endpoint runs server-side and needs  
+> this key to create users — the anon key alone is not enough.
+
+### 3. Run the dev server
+```bash
+bun run dev
+# → http://localhost:5000
+```
+
+### 4. Sign up & promote yourself to admin
+1. Go to `http://localhost:5000/auth`
+2. Sign up with a `@hyderabad.bits-pilani.ac.in` email
+3. Promote yourself in Supabase SQL Editor:
+
+```sql
+INSERT INTO public.user_roles (user_id, role)
+SELECT id, 'admin' FROM auth.users WHERE email = 'you@hyderabad.bits-pilani.ac.in';
+```
+
+### Production build
+```bash
+bun run build    # SSR build → dist/
+bun run preview  # preview the built output locally
+```
+
+---
+
 Read this **first**. There has been confusion about what was built vs. what
 still needs to be built. This file is the honest map.
 
