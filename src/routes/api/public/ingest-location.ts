@@ -1,12 +1,12 @@
 // POST /api/public/ingest-location
-// Called by the Expo app every ~5 minutes in the background.
+// Called by the Expo app (background task) and web app every ~5 minutes.
 // Body: { lat: number, lon: number }
 // Header: Authorization: Bearer <user JWT>
 //
 // PRIVACY: raw lat/lon NEVER touches storage.
 // We resolve the closest zone within its radius and insert ONLY (user_id, zone_id, occurred_at).
+// Response: { matched: true, zone_name: string } | { matched: false }
 import { createFileRoute } from "@tanstack/react-router";
-import { createClient } from "@supabase/supabase-js";
 
 // Haversine distance in meters — used to find the nearest zone.
 function distanceMeters(lat1: number, lon1: number, lat2: number, lon2: number) {
@@ -29,7 +29,6 @@ export const Route = createFileRoute("/api/public/ingest-location")({
         const token = auth.replace(/^Bearer\s+/i, "");
         if (!token) return new Response("Unauthorized", { status: 401 });
 
-        // Lazy-import the admin client (this route file ships to the client bundle).
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         const { data: userData, error: userErr } = await supabaseAdmin.auth.getUser(token);
         if (userErr || !userData.user) return new Response("Unauthorized", { status: 401 });
@@ -50,12 +49,14 @@ export const Route = createFileRoute("/api/public/ingest-location")({
         // 3. Load zones, pick the closest one within its radius.
         const { data: zones } = await supabaseAdmin
           .from("campus_zones")
-          .select("id,name,center_lat,center_lon,radius_m");
+          .select("id, name, center_lat, center_lon, radius_m");
 
-        let best: { id: string; d: number } | null = null;
+        let best: { id: string; name: string; d: number } | null = null;
         for (const z of zones ?? []) {
           const d = distanceMeters(lat, lon, z.center_lat, z.center_lon);
-          if (d <= z.radius_m && (!best || d < best.d)) best = { id: z.id, d };
+          if (d <= z.radius_m && (!best || d < best.d)) {
+            best = { id: z.id, name: z.name, d };
+          }
         }
 
         if (!best) {
@@ -69,7 +70,8 @@ export const Route = createFileRoute("/api/public/ingest-location")({
           zone_id: best.id,
         });
 
-        return Response.json({ matched: true });
+        // Return the matched zone name so web clients can display it.
+        return Response.json({ matched: true, zone_name: best.name });
       },
     },
   },

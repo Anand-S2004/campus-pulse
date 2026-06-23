@@ -31,3 +31,19 @@ self.addEventListener("fetch", (event) => {
       .catch(() => caches.match(event.request))
   );
 });
+
+// Background Periodic Sync — fires even when no tab is open (Chrome only).
+// We can't call navigator.geolocation from a SW, so we relay a message to
+// any open client tabs and let them do the actual location update.
+// If no tabs are open, the update is skipped silently.
+self.addEventListener("periodicsync", (event) => {
+  if (event.tag === "cp-location-update") {
+    event.waitUntil(
+      self.clients.matchAll({ type: "window" }).then((clients) => {
+        clients.forEach((client) =>
+          client.postMessage({ type: "cp-location-update" })
+        );
+      })
+    );
+  }
+});
