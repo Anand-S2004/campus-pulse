@@ -17,7 +17,7 @@ bun run preview    # preview the production build locally
 > **Allowed sign-up email domain:** `@hyderabad.bits-pilani.ac.in`
 
 ---
-
+npm install
 ## File Map — What Does What
 
 ### Configuration

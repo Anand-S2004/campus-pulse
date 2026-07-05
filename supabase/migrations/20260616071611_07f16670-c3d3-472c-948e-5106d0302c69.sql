@@ -67,6 +67,25 @@ CREATE TABLE public.posts (
   approved_by uuid REFERENCES auth.users(id),
   reject_reason text
 );
+ALTER TABLE public.posts
+ADD COLUMN approval_notification_sent_at timestamptz;
+ALTER TABLE public.posts
+ALTER COLUMN description DROP NOT NULL;
+CREATE INDEX posts_approval_notify_idx
+ON public.posts (
+    status,
+    approval_notification_sent_at,
+    approved_at
+);
+ALTER TABLE public.posts
+DROP CONSTRAINT posts_description_check;
+
+ALTER TABLE public.posts
+ADD CONSTRAINT posts_description_check
+CHECK (
+  description IS NULL
+  OR char_length(description) BETWEEN 1 AND 280
+);
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.posts TO authenticated;
 GRANT ALL ON public.posts TO service_role;
 ALTER TABLE public.posts ENABLE ROW LEVEL SECURITY;
@@ -116,6 +135,12 @@ CREATE TABLE public.location_events (
   zone_id uuid NOT NULL REFERENCES public.campus_zones(id) ON DELETE CASCADE,
   occurred_at timestamptz NOT NULL DEFAULT now()
 );
+CREATE INDEX location_user_zone_time_idx
+ON public.location_events (
+    user_id,
+    zone_id,
+    occurred_at DESC
+);
 GRANT SELECT ON public.location_events TO authenticated;
 GRANT ALL ON public.location_events TO service_role;
 ALTER TABLE public.location_events ENABLE ROW LEVEL SECURITY;
@@ -137,7 +162,8 @@ GRANT ALL ON public.pulse_cards TO service_role;
 ALTER TABLE public.pulse_cards ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "pulse read all" ON public.pulse_cards FOR SELECT TO authenticated USING (true);
 CREATE INDEX pulse_generated_idx ON public.pulse_cards (generated_for DESC);
-
+CREATE UNIQUE INDEX pulse_kind_day_unique
+ON public.pulse_cards(kind, generated_for);
 -- WEEKLY RECAPS (per user)
 CREATE TABLE public.weekly_recaps (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -151,11 +177,27 @@ CREATE TABLE public.weekly_recaps (
   created_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (user_id, week_start)
 );
+ALTER TABLE public.weekly_recaps
+ADD COLUMN recap_notification_sent_at timestamptz,
+ADD COLUMN shared_routine_score integer NOT NULL DEFAULT 0,
+ADD COLUMN shared_space_count integer NOT NULL DEFAULT 0,
+ADD COLUMN common_path_count integer NOT NULL DEFAULT 0,
+ADD COLUMN repeat_community_count integer NOT NULL DEFAULT 0,
+ADD COLUMN narrative text;
 GRANT SELECT ON public.weekly_recaps TO authenticated;
 GRANT ALL ON public.weekly_recaps TO service_role;
 ALTER TABLE public.weekly_recaps ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "recap self read" ON public.weekly_recaps FOR SELECT TO authenticated USING (user_id = auth.uid());
-
+CREATE INDEX weekly_recap_user_week_idx
+ON public.weekly_recaps (
+    user_id,
+    week_start DESC
+);
+CREATE INDEX weekly_recap_notification_idx
+ON public.weekly_recaps(
+  week_start,
+  recap_notification_sent_at
+);
 -- PUSH TOKENS (Expo)
 CREATE TABLE public.push_tokens (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -169,7 +211,8 @@ GRANT ALL ON public.push_tokens TO service_role;
 ALTER TABLE public.push_tokens ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "push self all" ON public.push_tokens FOR ALL TO authenticated
   USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
-
+CREATE INDEX push_tokens_user_idx
+ON public.push_tokens(user_id);
 -- Seed example zones (edit from the admin UI)
 INSERT INTO public.campus_zones (name, short_code, center_lat, center_lon, radius_m) VALUES
   ('SAC','SAC',28.4595,77.5826,80),

@@ -213,3 +213,168 @@ Then refresh `/moderate` or `/zones`.
 - `src/routes/api/public/*` — endpoints the Expo app and cron call.
 - `supabase/migrations/*.sql` — full schema, RLS, triggers.
 - `EXPO_INTEGRATION.md` — boilerplate for the mobile app you build separately.
+# Campus Pulse — Belonging-Oriented Weekly Recaps
+
+## Goal
+
+Campus Pulse is not therapy, counseling, or a mental-health intervention.
+
+Its purpose is to strengthen a student's sense of belonging by making the invisible campus community visible.
+
+The hypothesis is that people who consistently feel connected to a larger community may be less likely to drift into isolation and loneliness.
+
+The recap should never focus on popularity, social status, or engagement.
+
+Instead, it should reinforce a simple idea:
+
+**"You were not alone this week."**
+
+---
+
+# Core Principles
+
+## Avoid
+
+* "340 people crossed paths with you."
+* "X people noticed you."
+* "People were thinking about you."
+* "People care about you."
+
+These claims cannot be verified and may create negative interpretations.
+
+---
+
+## Prefer
+
+* "You shared spaces with others."
+* "You were part of campus activity."
+* "Many students had experiences similar to yours."
+* "You were part of a living community."
+
+The recap should emphasize participation and belonging rather than observation.
+
+---
+
+# Weekly Recap Features
+
+## Shared Spaces
+
+Example:
+
+> You spent time in 5 campus spaces this week.
+>
+> Hundreds of fellow students also visited those spaces as part of their daily routines.
+
+Purpose:
+
+Reinforces that campus life is shared.
+
+---
+
+## Familiar Paths
+
+Example:
+
+> You repeatedly walked the SAC–Library route this week.
+>
+> 184 other students also used this route multiple times.
+
+Purpose:
+
+Creates a sense of shared routines.
+
+Not:
+
+> "People saw you."
+
+Instead:
+
+> "Others walk similar paths."
+
+---
+
+## Community Rhythms
+
+Example:
+
+> The Library was most active on Tuesday evening.
+>
+> You were there during one of the busiest study periods of the week.
+
+Purpose:
+
+Makes the student feel connected to the campus rhythm.
+
+---
+
+## Shared Habits
+
+Example:
+
+> You visited the Library 4 times this week.
+>
+> 312 students followed a similar study pattern.
+
+Purpose:
+
+Normalizes behavior and reduces feelings of isolation.
+
+---
+
+## Campus Moments
+
+Example:
+
+> While you were moving around campus this week:
+>
+> • 12 clubs hosted activities
+> • 48 positive moments were shared
+> • Hundreds of students participated in campus life
+
+Purpose:
+
+Shows that the community is active and alive.
+
+---
+
+## Hidden Similarities
+
+Example:
+
+> Many students repeatedly visited the same quiet areas you did this week.
+>
+> You may have more in common with the people around you than you realize.
+
+Purpose:
+
+Creates connection without revealing identities.
+
+---
+
+## Community Reflection
+
+Examples:
+
+> You were part of a campus that studied, celebrated, explored, and grew together this week.
+
+> Even when days feel routine, thousands of students are navigating similar challenges alongside you.
+
+> Whatever kind of week you had, you were not experiencing campus alone.
+
+Purpose:
+
+The emotional anchor of the recap.
+
+---
+
+# Design Rule
+
+Every recap card should answer one question:
+
+"How can this statistic reinforce togetherness?"
+
+If a statistic only reports activity but does not strengthen belonging, it should not appear in the recap.
+
+The recap is not a dashboard.
+
+The recap is a reminder that students are part of a larger community.

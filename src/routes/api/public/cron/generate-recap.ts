@@ -95,18 +95,132 @@ export const Route = createFileRoute("/api/public/cron/generate-recap")({
             }
             crossed = seenUsers.size;
           }
+          // Shared spaces = users who visited at least one zone I visited
+          const myZoneIds = new Set(myRows.map((e) => e.zone_id));
 
-          await supabaseAdmin.from("weekly_recaps").upsert(
+          const { data: allWeekEvents } = await supabaseAdmin
+            .from("location_events")
+            .select("user_id, zone_id, occurred_at")
+            .neq("user_id", uid)
+            .gte("occurred_at", fromIso)
+            .lt("occurred_at", toIso);
+
+          const sharedUsers = new Set<string>();
+          const repeatedUsers = new Map<string, number>();
+          const commonPathUsers = new Map<string, number>();
+
+          for (const ev of allWeekEvents ?? []) {
+            if (myZoneIds.has(ev.zone_id)) {
+              sharedUsers.add(ev.user_id);
+            }
+
+            const hourKey =
+              `${ev.zone_id}:${new Date(ev.occurred_at).toISOString().slice(0, 13)}`;
+
+            if (myKeys.has(hourKey)) {
+              repeatedUsers.set(
+                ev.user_id,
+                (repeatedUsers.get(ev.user_id) ?? 0) + 1,
+              );
+            }
+          }
+
+          // Common paths = people who matched me at least 3 separate times
+          for (const [otherUser, count] of repeatedUsers.entries()) {
+            if (count >= 3) {
+              commonPathUsers.set(otherUser, count);
+            }
+          }
+
+          const sharedSpaceCount = sharedUsers.size;
+          const commonPathCount = commonPathUsers.size;
+
+          const repeatCommunityCount =
+            [...commonPathUsers.values()].filter((v) => v >= 5).length;
+
+          // Better score
+          const sharedRoutineScore = Math.min(
+            100,
+            Math.round(
+              sharedSpaceCount * 0.3 +
+              commonPathCount * 6 +
+              repeatCommunityCount * 10 +
+              crossed * 0.25,
+            ),
+          );
+          // narrative
+          const narrativeParts: string[] = [];
+          if (topZone) {
+            narrativeParts.push(
+              `You spent most of your week around ${topZone}.`
+            );
+          }
+
+          narrativeParts.push(
+            `${totalMoments} positive community moments were shared across campus.`
+          );
+
+          if (nearby > 0) {
+            narrativeParts.push(
+              `You were near ${nearby} of those moments.`
+            );
+          }
+
+          if (crossed > 0) {
+            narrativeParts.push(
+              `Your path intersected with ${crossed} other students.`
+            );
+          }
+
+          if (sharedSpaceCount > 0) {
+            narrativeParts.push(
+              `${sharedSpaceCount} people shared at least one campus space with you this week.`
+            );
+          }
+
+          if (commonPathCount > 0) {
+            narrativeParts.push(
+              `${commonPathCount} students followed a similar weekly path through campus.`
+            );
+          }
+
+          if (repeatCommunityCount > 0) {
+            narrativeParts.push(
+              `You repeatedly encountered familiar faces throughout the week.`
+            );
+          }
+
+          if (sharedRoutineScore >= 50) {
+            narrativeParts.push(
+              `Your routine was strongly connected to the broader campus community.`
+            );
+          } else if (sharedRoutineScore >= 25) {
+            narrativeParts.push(
+              `Your routine overlapped with several shared campus patterns.`
+            );
+          }
+
+          const narrative = narrativeParts.join(" ");
+          await supabaseAdmin.from("weekly_recaps").upsert<any>(
             {
               user_id: uid,
               week_start: weekStartDate,
+
               positive_moments: totalMoments,
               nearby_moments: nearby,
               zones_visited: zones.size,
               crossed_paths: crossed,
               top_zone: topZone ?? null,
+
+              shared_routine_score: sharedRoutineScore,
+              shared_space_count: sharedSpaceCount,
+              common_path_count: commonPathCount,
+              repeat_community_count: repeatCommunityCount,
+              narrative,
             },
-            { onConflict: "user_id,week_start" },
+            {
+              onConflict: "user_id,week_start",
+            },
           );
           generated += 1;
         }
