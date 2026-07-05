@@ -27,8 +27,8 @@
     ],
     "extra": {
       "SUPABASE_URL": "https://mtqyrbyudtduyoqtumlt.supabase.co",
-      "SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJzdXBhYmFzZS1yb290LWdvYWwiLCJhcHAiOiJhdXRoLXNlcnZpY2UiLCJleHAiOjM5OTk5OTk5OTl9.zZ1jQX8cQn4lP95f4gq0qg0X5uZ2lD0ySw5D2m2A9L4g",
-      "BACKEND_URL": "https://project--a47d5318-90cc-49fa-a067-99b4350c777a.lovable.app"
+      "SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im10cXlyYnl1ZHRkdXlvcXR1bWx0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1OTA3MzAsImV4cCI6MjA5NzE2NjczMH0.2IztZH7Qif4VKYwTgxVRup0Q2HtRb8HlcHeyJ_aHVA8",
+      "BACKEND_URL": "https://663b5e13-dec7-4b5c-8e57-4de07185e9a2-00-1qlx1r4djnan1.pike.replit.dev"
     }
   }
 }

@@ -18,6 +18,10 @@ export default defineConfig({
       port: 5000,
       strictPort: true,
       allowedHosts: true,
+      watch: {
+        // Exclude the Expo mobile project so its node_modules don't exhaust inotify watches
+        ignored: ["**/mobile/**", "**/.cache/**"],
+      },
     },
   },
 });
