@@ -2,26 +2,90 @@
 
 ---
 
-## 🖥️ Local Development — Quick Start
+## 🖥️ Run on Replit (Quick Start)
 
-### Prerequisites
-- [Bun](https://bun.sh) — `curl -fsSL https://bun.sh/install | bash`
-- A Supabase project (the live one is already configured — just grab your keys)
+This project has two parts: the **web admin dashboard** and the **student mobile app**.
+Both can run simultaneously in Replit.
 
-### 1. Clone & install
+### 1. Install dependencies
+
+```bash
+bun install          # web admin dependencies
+bun install          # mobile app dependencies (run inside mobile/)
+```
+
+From the root of the project, you can also run:
+
+```bash
+cd mobile && bun install
+```
+
+### 2. Start the web admin dashboard
+
+```bash
+bun run dev
+# → http://localhost:5000
+```
+
+This is already configured as the **Start application** workflow.
+
+### 3. Start the Expo mobile app
+
+```bash
+cd mobile
+BROWSER=none bun run start -- --port 8080
+```
+
+This is already configured as the **Start Frontend** workflow. It will print a QR code in the console. Scan it with the **Expo Go** app on your phone, or open `http://localhost:8080` in your browser to use the web version.
+
+### Run both at once
+
+Use the **Project** workflow (or press Run in the Replit toolbar). It starts both servers in parallel.
+
+---
+
+## 📱 Local Expo Mobile App Development
+
+If you are developing the mobile app locally (not on Replit):
+
+```bash
+cd mobile
+bun install
+bun run start
+# scan the QR code with Expo Go
+```
+
+The Expo dev server normally runs on port **8081**. On Replit it is configured to run on **8080** to avoid conflicts with the web admin dashboard.
+
+### Mobile app environment variables
+
+The mobile app reads these values from `app.json` under `expo.extra`:
+
+| Variable | Description |
+|---|---|
+| `SUPABASE_URL` | Supabase project URL |
+| `SUPABASE_ANON_KEY` | Supabase public/anon key |
+| `BACKEND_URL` | Replit backend URL for the custom HTTP API |
+
+You can also override them by setting `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, and `EXPO_PUBLIC_BACKEND_URL` in your shell environment.
+
+---
+
+## 🌐 Local Web Admin Development
+
 ```bash
 git clone https://github.com/Anand-S2004/campus-pulse.git
 cd campus-pulse
 bun install
 ```
 
-### 2. Set up environment variables
+### Set up environment variables
+
 ```bash
 cp .env.example .env
 ```
 
-Open `.env` and fill in **all four values** from your Supabase dashboard  
-(**Settings → API**):
+Open `.env` and fill in **all four values** from your Supabase dashboard (**Settings → API**):
 
 | Variable | Where to find it |
 |---|---|
@@ -29,17 +93,17 @@ Open `.env` and fill in **all four values** from your Supabase dashboard
 | `SUPABASE_PUBLISHABLE_KEY` / `VITE_SUPABASE_PUBLISHABLE_KEY` | Settings → API → `anon` / `public` key |
 | `SUPABASE_SERVICE_ROLE_KEY` | Settings → API → `service_role` key ⚠️ keep secret |
 
-> **"Invalid API key" error?** The most common cause is a missing or wrong  
-> `SUPABASE_SERVICE_ROLE_KEY`. The signup endpoint runs server-side and needs  
-> this key to create users — the anon key alone is not enough.
+> **"Invalid API key" error?** The most common cause is a missing or wrong `SUPABASE_SERVICE_ROLE_KEY`. The signup endpoint runs server-side and needs this key to create users — the anon key alone is not enough.
 
-### 3. Run the dev server
+### Run the dev server
+
 ```bash
 bun run dev
 # → http://localhost:5000
 ```
 
-### 4. Sign up & promote yourself to admin
+### Sign up & promote yourself to admin
+
 1. Go to `http://localhost:5000/auth`
 2. Sign up with a `@hyderabad.bits-pilani.ac.in` email
 3. Promote yourself in Supabase SQL Editor:
@@ -50,15 +114,11 @@ SELECT id, 'admin' FROM auth.users WHERE email = 'you@hyderabad.bits-pilani.ac.i
 ```
 
 ### Production build
+
 ```bash
 bun run build    # SSR build → dist/
 bun run preview  # preview the built output locally
 ```
-
----
-
-Read this **first**. There has been confusion about what was built vs. what
-still needs to be built. This file is the honest map.
 
 ---
 
@@ -75,306 +135,236 @@ So this repo contains two things:
 
 1. A **web app** for moderators / admins (built with TanStack Start + React).
 2. A **Supabase backend** (Postgres tables, RLS, cron jobs, public HTTP
-   endpoints) that **both** the web admin and your future Expo app will talk
-   to.
+   endpoints under `src/routes/api/public/`).
 
-The student-facing mobile app (feed, posting, background location, push
-notifications, recap viewer) is **not** in this repo. It is meant to be a
-separate Expo project that you build, pointing at the same Supabase. See
-`EXPO_INTEGRATION.md` for the boilerplate.
+The student-facing mobile app is in the `mobile/` directory and is built with **Expo + React Native**.
 
----
+## 2. How the mobile app talks to this backend
 
-## 2. What works right now (web side)
+See `EXPO_INTEGRATION.md` for full API documentation.
 
-| Feature | Where | Status |
-|---|---|---|
-| College-email sign up (`@hyderabad.bits-pilani.ac.in` only) | `/auth` → calls `/api/public/auth/signup` | ✅ Working — confirmed, 1 profile already in DB |
-| Email + password sign in | `/auth` | ✅ Working |
-| Auth-protected routes | everything under `_authenticated/` | ✅ Working |
-| Moderator approval queue (approve / reject posts) | `/moderate` | ✅ UI built, RLS enforced |
-| Campus zones CRUD (name, center lat/lon, radius) | `/zones` | ✅ UI built (admin only) |
-| Personal weekly recap viewer | `/recap` | ✅ UI built |
-| Home / dashboard | `/` (after sign in) | ✅ Basic shell |
+Short version:
 
-### Backend that's live in your Lovable Cloud project
+- The mobile app uses `@supabase/supabase-js` directly for auth, posts, feed, reactions, and weekly recaps.
+- It also calls the custom backend at `BACKEND_URL` for:
+  - `/api/public/auth/signup` — college-email-gated signup
+  - `/api/public/ingest-location` — zone matching without storing raw GPS
+  - `/api/public/register-push-token` — push token registration
 
-- **Tables**: `profiles`, `user_roles`, `campus_zones`, `posts`, `reactions`,
-  `location_events`, `pulse_cards`, `weekly_recaps`, `push_tokens`.
-- **Row-Level Security** on every table. Students see only approved posts;
-  moderators see the queue; users see only their own location events / recap.
-- **Weekly post limit trigger**: max 2 posts / user / week (DB-enforced).
-- **Public HTTP endpoints** the Expo app will call:
-  - `POST /api/public/auth/signup` — college-email-gated signup
-  - `POST /api/public/ingest-location` — converts GPS → nearest zone,
-    **discards raw coordinates**, stores only `(user_id, zone_id, ts)`
-  - `POST /api/public/register-push-token` — store Expo push tokens
-- **Cron-style endpoints** (you wire pg_cron or external scheduler to hit them):
-  - `/api/public/cron/notify-approvals` — every 5 min, push on new approvals
-  - `/api/public/cron/generate-pulse` — daily, build community pulse cards
-  - `/api/public/cron/generate-recap` — Mondays, build per-user recap
-  - `/api/public/cron/push-recaps` — Mondays, push the recap notifications
+## 3. Tech stack
 
----
+| Layer | Technology |
+|---|---|
+| Web admin | TanStack Start, React 19, Vite 7, Tailwind CSS v4, shadcn/ui |
+| Mobile app | Expo SDK 57, React Native 0.86, expo-router |
+| Database / Auth | Supabase (Postgres + RLS) |
+| Runtime | Bun |
 
-## 3. What this project does NOT do
+## 4. Project layout
 
-Be very clear about this — these are **not bugs**, they are out of scope for
-the web side:
+```
+/                  web admin (TanStack Start)
+  src/
+    routes/          pages and API routes
+    lib/             utilities
+    components/      UI components
+  supabase/          migrations and SQL
+  mobile/            Expo mobile app
+    app/             expo-router pages
+    src/             hooks, lib, services, providers
+```
 
-- ❌ **No mobile app**. No React Native, no Expo, no native build. Lovable
-  cannot generate Expo projects. You build that separately.
-- ❌ **No background GPS collection**. That needs `expo-location` running on a
-  real device. The *server-side* zone conversion is ready and waiting; the
-  *client-side* collector is your Expo job.
-- ❌ **No push notifications are actually sent yet.** The `push_tokens` table
-  and cron endpoints exist, but the call to Expo's push API is a TODO inside
-  the cron handlers — and it can't fire until at least one Expo device
-  registers a token.
-- ❌ **No student feed UI on the web.** The web app is admin-only by design.
-  Feed, post composer, reactions, pulse cards — all rendered in Expo.
-- ❌ **pg_cron is not auto-scheduled.** The endpoints exist, but the actual
-  `cron.schedule(...)` calls were not added. You either add them via a
-  migration or hit the URLs from an external scheduler.
-- ❌ **No Google / Apple / magic-link login.** Email + password only, as
-  requested.
-- ❌ **No moderator/admin role is auto-assigned.** Every new signup gets the
-  `student` role. You must promote yourself manually — see §5.
+## 5. Common issues on Replit
+
+### "ENOSPC: System limit for number of file watchers reached"
+
+Both Vite (web admin) and Metro (Expo) need file watchers. The kernel limit on this container is too small for both to watch everything. We fixed this by telling Vite to ignore the `mobile/` directory in its file watcher. If you still see this error, restart both workflows so the change is picked up.
+
+### Expo QR code doesn't appear
+
+The Expo dev server needs to start without trying to open a browser. On Replit, the workflow runs:
+
+```bash
+cd mobile && BROWSER=none bun run start -- --port 8080
+```
+
+The `BROWSER=none` flag prevents it from trying to open a browser in a headless environment, so the QR code prints in the workflow console instead.
+
+### "Invalid API key" on mobile signup
+
+Make sure `mobile/app.json` → `extra.SUPABASE_ANON_KEY` is the **anon** key from your Supabase project (not the service role key). The backend service role key is only used on the server side.
 
 ---
 
-## 4. "I can't log in" — most likely causes
-
-The Supabase auth logs show repeated `400 invalid_credentials` from your
-session. The backend is responding correctly — those errors mean the
-email/password combination did not match a user. Concretely:
-
-1. **You tried to sign in without signing up first.** Toggle the form to
-   **"Need an account? Sign up"**, enter a `@hyderabad.bits-pilani.ac.in`
-   email + password (8+ chars) + display name, submit. That hits
-   `/api/public/auth/signup`, creates the auth user, the profile, and the
-   `student` role, then signs you in.
-2. **You used a non-college email.** The server rejects anything that doesn't
-   end in `@hyderabad.bits-pilani.ac.in`. To change the allowed domain, edit
-   `src/lib/college.ts` **and** the CHECK constraint on `profiles.email` in
-   the migration.
-3. **Wrong password on an existing account.** There is no password-reset flow
-   wired up yet. Fastest fix: sign up with a new email.
-
-There is already **1 profile** in your database, so signup is provably
-working end-to-end.
+Read this **first**. There has been confusion about what was built vs. what
+still needs to be built. This file is the honest map.
 
 ---
 
-## 5. How to become a moderator / admin
+# What this project IS
 
-New signups are `student`. To approve posts or manage zones you need to
-promote yourself. Open Cloud → Database → SQL editor and run **one** of:
+This Lovable project is the **web admin dashboard + shared Supabase backend**
+for Campus Pulse. It is intentionally **not** the student-facing app.
+
+You picked this split yourself earlier in the conversation:
+
+> "Build a web admin + backend, you do Expo separately"
+
+So this repo contains two things:
+
+1. A **web app** for moderators / admins (built with TanStack Start + React).
+2. A **Supabase backend** (Postgres tables, RLS, cron jobs, public HTTP
+   endpoints).
+
+The student-facing mobile app is built separately in **Expo + React Native**.
+
+---
+
+# What this project is NOT
+
+- It is **not** the mobile app. That is the Expo project in `mobile/`.
+
+---
+
+# Live URLs (if you publish this Lovable project)
+
+| Environment | URL |
+|---|---|
+| Production | `https://project--a47d5318-90cc-49fa-a067-99b4350c777a.lovable.app` |
+| Development | `https://project--a47d5318-90cc-49fa-a067-99b4350c777a-dev.lovable.app` |
+
+On Replit, the running backend URL is shown in the preview pane port selector.
+
+---
+
+# The Web Admin
+
+## Purpose
+
+Moderators and admins use the web app to:
+
+- Approve / reject student posts
+- Manage campus zones
+- View weekly recaps and community stats
+- Oversee users and roles
+
+## Tech Stack
+
+- **Framework:** TanStack Start (React, SSR, Vite)
+- **Styling:** Tailwind CSS v4 + shadcn/ui
+- **Auth:** Supabase Auth (email/password, college email gated)
+- **Database:** Supabase Postgres with RLS
+
+## Web Routes
+
+| Route | Purpose |
+|---|---|
+| `/` | Feed (authenticated) |
+| `/auth` | Sign in / sign up |
+| `/moderate` | Post approval queue |
+| `/zones` | Admin zone CRUD |
+| `/recap` | Weekly recap |
+| `/api/public/*` | Public HTTP endpoints used by the mobile app |
+
+---
+
+# The Mobile App (Expo)
+
+See the `mobile/` directory and `EXPO_INTEGRATION.md` for the full API guide.
+
+## Mobile app setup
+
+```bash
+cd mobile
+bun install
+bun run start
+# scan the QR code with Expo Go
+```
+
+On Replit, the mobile app is configured to run on port **8080** and prints a QR code in the **Start Frontend** workflow console.
+
+## Mobile App Responsibilities
+
+- Student auth (email/password, college email gated)
+- Submit posts (max 2/week, goes to pending approval)
+- Heart / react to posts
+- View daily Community Pulse and weekly recap
+- Background location tracking for anonymous zone matching
+- Push notifications
+
+---
+
+# The Supabase Backend
+
+## Database Tables
+
+```
+profiles          one per auth user (college email enforced by CHECK)
+user_roles        admin | moderator | student
+campus_zones      circular zones (name, center_lat, center_lon, radius_m)
+posts             user_id, category, location_label, description, status, ...
+reactions         (post_id, user_id) — single ❤️
+location_events   zone_id + occurred_at ONLY (raw GPS never stored)
+pulse_cards       auto-generated daily "Community Pulse" snippets
+weekly_recaps     per-user, per-week stats card
+push_tokens       Expo push tokens
+```
+
+## Public API Endpoints
+
+Located in `src/routes/api/public/`:
+
+| Endpoint | Purpose |
+|---|---|
+| `/api/public/auth/signup` | College-email-gated signup, creates profile, assigns `student` role |
+| `/api/public/ingest-location` | Receives raw GPS, matches to campus zone, stores only zone_id + timestamp |
+| `/api/public/register-push-token` | Registers Expo push token |
+| `/api/public/cron/generate-pulse` | Generates daily pulse cards (called by pg_cron) |
+| `/api/public/cron/generate-recap` | Generates weekly recap (Monday) |
+| `/api/public/cron/notify-approvals` | Every 5 min: pushes approved post notifications |
+| `/api/public/cron/push-recaps` | Sub-route: pushes recap notifications |
+
+## Cron Jobs
+
+Already scheduled via `pg_cron`:
+
+- **Every 5 minutes:** push newly approved post notifications
+- **Daily:** generate Community Pulse cards
+- **Every Monday:** generate weekly recaps and push notifications
+
+---
+
+# Authentication
+
+## College Email Domain
+
+Default: `@hyderabad.bits-pilani.ac.in`
+
+To change it, edit:
+1. `src/lib/college.ts` → `COLLEGE_EMAIL_DOMAIN`
+2. Run a migration to update the `profiles.college_email_only` CHECK constraint regex.
+
+## Role Assignment
+
+Make someone an admin or moderator from Supabase SQL Editor:
 
 ```sql
--- become a moderator (can approve / reject posts)
-INSERT INTO public.user_roles (user_id, role)
-SELECT id, 'moderator' FROM auth.users WHERE email = 'you@hyderabad.bits-pilani.ac.in';
-
--- become an admin (also manages zones)
 INSERT INTO public.user_roles (user_id, role)
 SELECT id, 'admin' FROM auth.users WHERE email = 'you@hyderabad.bits-pilani.ac.in';
 ```
 
-Then refresh `/moderate` or `/zones`.
+Replace `'admin'` with `'moderator'` for moderation-only access.
 
 ---
 
-## 6. What you need to do next
-
-**On the Lovable side (this repo):**
-
-- Sign up at `/auth`, promote yourself to `admin`, add a few campus zones at
-  `/zones` so the location-ingest endpoint has something to snap to.
-- Optionally: schedule the cron endpoints (pg_cron or a free external cron
-  service hitting the four URLs above).
-
-**On the Expo side (separate project, not in Lovable):**
-
-- Follow `EXPO_INTEGRATION.md`. It contains:
-  - Supabase client setup with the **publishable** key.
-  - `expo-location` background task posting to `/api/public/ingest-location`
-    every 5 min.
-  - `expo-notifications` registering a token to `/api/public/register-push-token`.
-  - Feed / post composer screens hitting the `posts` table directly via RLS.
-
----
-
-## 7. Files worth knowing
-
-- `src/lib/college.ts` — single source of truth for the allowed email domain.
-- `src/routes/auth.tsx` — sign in / sign up form.
-- `src/routes/_authenticated/*` — admin pages (require login).
-- `src/routes/api/public/*` — endpoints the Expo app and cron call.
-- `supabase/migrations/*.sql` — full schema, RLS, triggers.
-- `EXPO_INTEGRATION.md` — boilerplate for the mobile app you build separately.
-# Campus Pulse — Belonging-Oriented Weekly Recaps
-
-## Goal
-
-Campus Pulse is not therapy, counseling, or a mental-health intervention.
-
-Its purpose is to strengthen a student's sense of belonging by making the invisible campus community visible.
-
-The hypothesis is that people who consistently feel connected to a larger community may be less likely to drift into isolation and loneliness.
-
-The recap should never focus on popularity, social status, or engagement.
-
-Instead, it should reinforce a simple idea:
-
-**"You were not alone this week."**
-
----
-
-# Core Principles
-
-## Avoid
-
-* "340 people crossed paths with you."
-* "X people noticed you."
-* "People were thinking about you."
-* "People care about you."
-
-These claims cannot be verified and may create negative interpretations.
-
----
-
-## Prefer
-
-* "You shared spaces with others."
-* "You were part of campus activity."
-* "Many students had experiences similar to yours."
-* "You were part of a living community."
-
-The recap should emphasize participation and belonging rather than observation.
-
----
-
-# Weekly Recap Features
-
-## Shared Spaces
-
-Example:
-
-> You spent time in 5 campus spaces this week.
->
-> Hundreds of fellow students also visited those spaces as part of their daily routines.
-
-Purpose:
-
-Reinforces that campus life is shared.
-
----
-
-## Familiar Paths
-
-Example:
-
-> You repeatedly walked the SAC–Library route this week.
->
-> 184 other students also used this route multiple times.
-
-Purpose:
-
-Creates a sense of shared routines.
-
-Not:
-
-> "People saw you."
-
-Instead:
-
-> "Others walk similar paths."
-
----
-
-## Community Rhythms
-
-Example:
-
-> The Library was most active on Tuesday evening.
->
-> You were there during one of the busiest study periods of the week.
-
-Purpose:
-
-Makes the student feel connected to the campus rhythm.
-
----
-
-## Shared Habits
-
-Example:
-
-> You visited the Library 4 times this week.
->
-> 312 students followed a similar study pattern.
-
-Purpose:
-
-Normalizes behavior and reduces feelings of isolation.
-
----
-
-## Campus Moments
-
-Example:
-
-> While you were moving around campus this week:
->
-> • 12 clubs hosted activities
-> • 48 positive moments were shared
-> • Hundreds of students participated in campus life
-
-Purpose:
-
-Shows that the community is active and alive.
-
----
-
-## Hidden Similarities
-
-Example:
-
-> Many students repeatedly visited the same quiet areas you did this week.
->
-> You may have more in common with the people around you than you realize.
-
-Purpose:
-
-Creates connection without revealing identities.
-
----
-
-## Community Reflection
-
-Examples:
-
-> You were part of a campus that studied, celebrated, explored, and grew together this week.
-
-> Even when days feel routine, thousands of students are navigating similar challenges alongside you.
-
-> Whatever kind of week you had, you were not experiencing campus alone.
-
-Purpose:
-
-The emotional anchor of the recap.
-
----
-
-# Design Rule
+# Weekly Recap Design Rule
 
 Every recap card should answer one question:
 
-"How can this statistic reinforce togetherness?"
+> "How can this statistic reinforce togetherness?"
 
 If a statistic only reports activity but does not strengthen belonging, it should not appear in the recap.
 
-The recap is not a dashboard.
+The recap is not a dashboard. It is a reminder that students are part of a larger community.
 
-The recap is a reminder that students are part of a larger community.
+---
