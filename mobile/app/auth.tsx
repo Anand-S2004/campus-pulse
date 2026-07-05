@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { ScreenShell } from '../src/components/ScreenShell';
 import { useAuth } from '../src/hooks/use-auth-session';
@@ -12,6 +12,7 @@ export default function AuthScreen() {
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [busy, setBusy] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
     if (!loading && session) {
@@ -20,8 +21,9 @@ export default function AuthScreen() {
   }, [loading, session]);
 
   const onSubmit = async () => {
+    setErrorMsg(null);
     if (!email || !password) {
-      Alert.alert('Please enter your details.');
+      setErrorMsg('Please enter your email and password.');
       return;
     }
 
@@ -31,13 +33,13 @@ export default function AuthScreen() {
         await signIn(email.trim(), password);
       } else {
         if (!displayName.trim()) {
-          Alert.alert('Add a friendly display name to continue.');
+          setErrorMsg('Add a friendly display name to continue.');
           return;
         }
         await signUp(email.trim(), password, displayName.trim());
       }
     } catch (error) {
-      Alert.alert('Authentication issue', error instanceof Error ? error.message : 'Please try again.');
+      setErrorMsg(error instanceof Error ? error.message : 'Please try again.');
     } finally {
       setBusy(false);
     }
@@ -74,11 +76,17 @@ export default function AuthScreen() {
           secureTextEntry
         />
 
-        <Pressable style={styles.primaryButton} onPress={onSubmit}>
+        {errorMsg ? (
+          <View style={styles.errorBox}>
+            <Text style={styles.errorText}>{errorMsg}</Text>
+          </View>
+        ) : null}
+
+        <Pressable style={[styles.primaryButton, busy && styles.primaryButtonDisabled]} onPress={onSubmit} disabled={busy}>
           <Text style={styles.primaryButtonText}>{busy ? 'Working…' : mode === 'signIn' ? 'Sign in' : 'Create account'}</Text>
         </Pressable>
 
-        <Pressable onPress={() => setMode(mode === 'signIn' ? 'signUp' : 'signIn')}>
+        <Pressable onPress={() => { setMode(mode === 'signIn' ? 'signUp' : 'signIn'); setErrorMsg(null); }}>
           <Text style={styles.switchText}>{mode === 'signIn' ? 'Need an account? Create one' : 'Already have an account? Sign in'}</Text>
         </Pressable>
       </View>
@@ -122,5 +130,21 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 4,
     fontWeight: '600',
+  },
+  errorBox: {
+    backgroundColor: '#fef2f2',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: '#fecaca',
+  },
+  errorText: {
+    color: '#dc2626',
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  primaryButtonDisabled: {
+    opacity: 0.6,
   },
 });
