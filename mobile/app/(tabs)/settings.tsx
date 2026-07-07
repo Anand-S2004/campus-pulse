@@ -10,7 +10,7 @@ import { requestNotificationPermission } from '../../src/services/notifications'
 import { requestLocationPermissions } from '../../src/services/location';
 
 export default function SettingsScreen() {
-  const { profile, signOut } = useAuth();
+  const { profile, role, signOut } = useAuth();
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [locationEnabled, setLocationEnabled] = useState(false);
 
@@ -58,6 +58,11 @@ export default function SettingsScreen() {
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>Your calm profile</Text>
         <Text style={styles.body}>{profile?.display_name ?? 'Campus friend'}</Text>
+        {role ? (
+          <View style={styles.roleBadge}>
+            <Text style={styles.roleText}>{role}</Text>
+          </View>
+        ) : null}
 
         <View style={styles.settingRow}>
           <View>
@@ -108,6 +113,20 @@ const styles = StyleSheet.create({
   },
   body: {
     color: '#4b5563',
+  },
+  roleBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#e0e7ff',
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginTop: 10,
+  },
+  roleText: {
+    color: '#4338ca',
+    fontWeight: '700',
+    fontSize: 12,
+    textTransform: 'capitalize',
   },
   settingRow: {
     flexDirection: 'row',

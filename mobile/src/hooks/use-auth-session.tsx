@@ -3,6 +3,7 @@ import type { Session, User } from '@supabase/supabase-js';
 
 import { BACKEND_URL } from '../lib/config';
 import { supabase } from '../lib/supabase';
+import type { Role } from '../types';
 
 type ProfileData = {
   id: string;
@@ -14,6 +15,7 @@ type AuthContextValue = {
   session: Session | null;
   user: User | null;
   profile: ProfileData | null;
+  role: Role;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, displayName: string) => Promise<void>;
@@ -26,6 +28,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<ProfileData | null>(null);
+  const [role, setRole] = useState<Role>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -40,6 +43,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       setSession(initialSession);
       setUser(initialSession?.user ?? null);
+      if (initialSession?.user) {
+        await loadRole(initialSession.user.id);
+      } else {
+        setRole(null);
+      }
       setLoading(false);
     };
 
@@ -51,8 +59,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       setSession(nextSession);
       setUser(nextSession?.user ?? null);
+      if (nextSession?.user) {
+        loadRole(nextSession.user.id);
+      } else {
+        setRole(null);
+      }
       setLoading(false);
     });
+
+    async function loadRole(uid: string) {
+      const { data } = await supabase.from('user_roles').select('role').eq('user_id', uid);
+      const roles = (data ?? []) as { role: Exclude<Role, null> }[];
+      if (!active) return;
+      if (roles.some((r) => r.role === 'admin')) setRole('admin');
+      else if (roles.some((r) => r.role === 'moderator')) setRole('moderator');
+      else setRole('student');
+    }
 
     return () => {
       active = false;
@@ -112,8 +134,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ session, user, profile, loading, signIn, signUp, signOut }),
-    [loading, profile, session, signIn, signOut, signUp, user],
+    () => ({ session, user, profile, role, loading, signIn, signUp, signOut }),
+    [loading, profile, role, session, signIn, signOut, signUp, user],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

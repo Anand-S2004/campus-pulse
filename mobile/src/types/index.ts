@@ -35,3 +35,24 @@ export interface FeedPage {
   pulseCards: PulseCardItem[];
   hasMore: boolean;
 }
+
+export type Role = 'admin' | 'moderator' | 'student' | null;
+
+export interface PendingPost {
+  id: string;
+  category: PostCategory;
+  location_label: string;
+  description: string | null;
+  created_at: string;
+  user_id: string;
+  profiles: { display_name: string | null; email: string | null } | null;
+}
+
+export interface CampusZone {
+  id: string;
+  name: string;
+  short_code: string | null;
+  center_lat: number;
+  center_lon: number;
+  radius_m: number;
+}
