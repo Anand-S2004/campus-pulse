@@ -39,7 +39,8 @@ export default function ModerateScreen() {
         approved_at: status === 'approved' ? new Date().toISOString() : null,
         approved_by: user?.id,
       })
-      .eq('id', id);
+      .eq('id', id)
+      .eq('status', 'pending');
     setDecidingId(null);
     if (error) {
       setErrorMsg(error.message);

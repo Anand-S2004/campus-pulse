@@ -24,8 +24,22 @@ export default function TabsLayout() {
     >
       <Tabs.Screen name="index" options={{ title: 'Feed', tabBarLabel: 'Feed' }} />
       <Tabs.Screen name="create" options={{ title: 'Share', tabBarLabel: 'Share' }} />
-      {isModerator && <Tabs.Screen name="moderate" options={{ title: 'Moderate', tabBarLabel: 'Moderate' }} />}
-      {isAdmin && <Tabs.Screen name="zones" options={{ title: 'Zones', tabBarLabel: 'Zones' }} />}
+      <Tabs.Screen
+        name="moderate"
+        options={{
+          title: 'Moderate',
+          tabBarLabel: 'Moderate',
+          tabBarButton: isModerator ? undefined : () => null,
+        }}
+      />
+      <Tabs.Screen
+        name="zones"
+        options={{
+          title: 'Zones',
+          tabBarLabel: 'Zones',
+          tabBarButton: isAdmin ? undefined : () => null,
+        }}
+      />
       <Tabs.Screen name="recap" options={{ title: 'Recap', tabBarLabel: 'Recap' }} />
       <Tabs.Screen name="settings" options={{ title: 'Settings', tabBarLabel: 'Settings' }} />
     </Tabs>

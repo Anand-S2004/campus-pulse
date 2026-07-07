@@ -55,13 +55,36 @@ export default function ZonesScreen() {
 
   async function createZone() {
     setErrorMsg(null);
+    if (!form.name.trim()) {
+      setErrorMsg('Please enter a zone name.');
+      return;
+    }
+    if (!form.center_lat.trim() || !form.center_lon.trim() || !form.radius_m.trim()) {
+      setErrorMsg('Latitude, longitude, and radius are required.');
+      return;
+    }
+    const lat = Number(form.center_lat);
+    const lon = Number(form.center_lon);
+    const radius = Number(form.radius_m);
+    if (!Number.isFinite(lat) || lat < -90 || lat > 90) {
+      setErrorMsg('Latitude must be a finite number between -90 and 90.');
+      return;
+    }
+    if (!Number.isFinite(lon) || lon < -180 || lon > 180) {
+      setErrorMsg('Longitude must be a finite number between -180 and 180.');
+      return;
+    }
+    if (!Number.isFinite(radius) || radius <= 0) {
+      setErrorMsg('Radius must be a positive finite number.');
+      return;
+    }
     setBusy(true);
     const { error } = await supabase.from('campus_zones').insert({
-      name: form.name,
-      short_code: form.short_code || null,
-      center_lat: Number(form.center_lat),
-      center_lon: Number(form.center_lon),
-      radius_m: Number(form.radius_m),
+      name: form.name.trim(),
+      short_code: form.short_code.trim() || null,
+      center_lat: lat,
+      center_lon: lon,
+      radius_m: radius,
     });
     setBusy(false);
     if (error) {

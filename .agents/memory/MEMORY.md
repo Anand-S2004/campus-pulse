@@ -1,0 +1,2 @@
+- [Expo Router tab hiding](expo-router-tab-hiding.md) — keep tab screens registered and hide buttons with `tabBarButton: () => null`; conditional `Tabs.Screen` mounting breaks route stability and throws at runtime.
+- [Supabase embedded relation selects](supabase-embedded-relations.md) — foreign-table selects like `profiles(...)` return arrays, not a single object; normalize `[0]` before using in UI types.
