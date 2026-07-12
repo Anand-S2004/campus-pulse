@@ -102,27 +102,32 @@ export async function fetchFeedPage(page = 0, limit = 10): Promise<FeedPage> {
 }
 
 export async function createPost(input: { description: string; locationLabel: string; category: PostCategory }) {
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-  if (userError || !user) {
-    throw new Error('Please sign in before sharing a positive moment.');
-  }
-
-  // Posts must be inserted as 'pending' — the RLS policy on public.posts
-  // ("posts self insert") only allows self-inserts with status = 'pending'.
-  // A moderator/admin approves posts afterwards (see the web admin's Moderate page).
-  const { error } = await supabase.from('posts').insert({
-    user_id: user.id,
-    description: input.description,
-    location_label: input.locationLabel || 'Campus community',
-    category: input.category,
-    status: 'pending',
+  // Use the server-side /api/public/create-post endpoint instead of a direct Supabase
+  // insert. Several users were hitting the cryptic "new row violates row-level security
+  // policy for table \"posts\"" error even after the mobile client set status='pending'.
+  // The server endpoint validates the session explicitly, checks the weekly limit, and
+  // inserts with the service-role client, so posting cannot fail because of RLS on the
+  // device.
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${BACKEND_URL}/api/public/create-post`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      description: input.description,
+      locationLabel: input.locationLabel || 'Campus community',
+      category: input.category,
+    }),
   });
 
-  if (error) {
-    throw error;
+  if (!response.ok) {
+    let message = 'Please try again in a moment.';
+    try {
+      const payload = (await response.json()) as { error?: string };
+      if (payload.error) message = payload.error;
+    } catch {
+      // ignore parse failure
+    }
+    throw new Error(message);
   }
 }
 

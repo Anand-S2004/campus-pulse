@@ -12,25 +12,54 @@ a `@hyderabad.bits-pilani.ac.in` email (id `8f24ea5a-c225-49b9-b3a2-48aeb7f6c4e5
 
 ## 1. "Could not share" / RLS error when posting from mobile
 
-**Root cause:** `heartbits/src/lib/api.ts` `createPost()` inserted posts with
-`status: 'approved'`. The `posts` RLS INSERT policy only allows a user to insert their
-own post when `status = 'pending'` (approval is granted later by a moderator/admin). Every
-mobile post attempt was rejected by Postgres RLS.
+**Root cause:** The mobile app initially inserted posts directly into `public.posts` with
+`status: 'approved'`, which violated the RLS INSERT policy that only allows self-inserts
+with `status = 'pending'`. Even after fixing the mobile client to use `'pending'`, some
+users continued to see the cryptic "new row violates row-level security policy for table
+\"posts\"" error (likely due to stale Expo JS bundles, session edge cases, or auth-token
+handling in the device).
 
-**Fix:** Changed the mobile insert to use `status: 'pending'`, matching the web admin's
-behavior exactly.
+**Permanent fix:** Mobile posting now goes through a server-side endpoint,
+`POST /api/public/create-post`, instead of a direct Supabase insert. The endpoint:
+- Validates the user's Bearer token explicitly.
+- Checks the 2-post/week limit and returns a clear human-readable error.
+- Inserts the post as `status='pending'` using the service-role client, so device-side
+  RLS can never block it.
+- Returns explicit, friendly error messages instead of raw Postgres codes.
 
-**Proof (curl against the live Supabase REST API, using the test user's access token):**
+**Files changed:**
+- `src/routes/api/public/create-post.ts` — new endpoint.
+- `heartbits/src/lib/api.ts` — `createPost()` now calls the endpoint.
+
+**Proof (curl against the new endpoint, using a real test user's access token):**
 
 ```
-$ curl -X POST "$SUPABASE_URL/rest/v1/posts" -H "Authorization: Bearer $TOKEN" \
-  -d '{"status":"approved", ...}'
-→ 401 { "code": "42501", "message": "new row violates row-level security policy for table \"posts\"" }
-   (this is the exact failure the old mobile code triggered on every share)
+$ curl -X POST http://localhost:5000/api/public/create-post \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"description":"server endpoint test 1","locationLabel":"SAC","category":"kindness"}'
+→ {"ok":true}
 
-$ curl -X POST "$SUPABASE_URL/rest/v1/posts" -H "Authorization: Bearer $TOKEN" \
-  -d '{"status":"pending", ...}'
-→ 201 Created   (matches the fixed mobile behavior — post succeeds)
+$ curl -X POST http://localhost:5000/api/public/create-post \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"description":"server endpoint test 2","locationLabel":"Library","category":"social"}'
+→ {"ok":true}
+
+$ curl -X POST http://localhost:5000/api/public/create-post \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"description":"server endpoint test 3","locationLabel":"OFG","category":"other"}'
+→ {"error":"Weekly post limit reached (2 per week)."}  (429)
+
+$ curl -X POST http://localhost:5000/api/public/create-post \
+  -H "Authorization: Bearer invalid-token" -H "Content-Type: application/json" \
+  -d '{"description":"should fail","locationLabel":"SAC","category":"kindness"}'
+→ {"error":"Your session expired. Please sign in again."}  (401)
+
+# Database verification: posts are inserted with status='pending'
+$ curl "$SUPABASE_URL/rest/v1/posts?user_id=eq.$USERID&select=description,location_label,status"
+→ [
+     {"description":"server endpoint test 2","location_label":"Library","status":"pending"},
+     {"description":"server endpoint test 1","location_label":"SAC","status":"pending"}
+   ]
 ```
 
 ---

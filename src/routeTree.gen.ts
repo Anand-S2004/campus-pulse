@@ -17,6 +17,7 @@ import { Route as AuthenticatedRecapRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedModerateRouteImport } from './routes/_authenticated/moderate'
 import { Route as ApiPublicRegisterPushTokenRouteImport } from './routes/api/public/register-push-token'
 import { Route as ApiPublicIngestLocationRouteImport } from './routes/api/public/ingest-location'
+import { Route as ApiPublicCreatePostRouteImport } from './routes/api/public/create-post'
 import { Route as ApiPublicCronPushRecapsRouteImport } from './routes/api/public/cron/push-recaps'
 import { Route as ApiPublicCronNotifyApprovalsRouteImport } from './routes/api/public/cron/notify-approvals'
 import { Route as ApiPublicCronGenerateRecapRouteImport } from './routes/api/public/cron/generate-recap'
@@ -63,6 +64,11 @@ const ApiPublicIngestLocationRoute = ApiPublicIngestLocationRouteImport.update({
   path: '/api/public/ingest-location',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicCreatePostRoute = ApiPublicCreatePostRouteImport.update({
+  id: '/api/public/create-post',
+  path: '/api/public/create-post',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicCronPushRecapsRoute = ApiPublicCronPushRecapsRouteImport.update({
   id: '/api/public/cron/push-recaps',
   path: '/api/public/cron/push-recaps',
@@ -98,6 +104,7 @@ export interface FileRoutesByFullPath {
   '/moderate': typeof AuthenticatedModerateRoute
   '/recap': typeof AuthenticatedRecapRoute
   '/zones': typeof AuthenticatedZonesRoute
+  '/api/public/create-post': typeof ApiPublicCreatePostRoute
   '/api/public/ingest-location': typeof ApiPublicIngestLocationRoute
   '/api/public/register-push-token': typeof ApiPublicRegisterPushTokenRoute
   '/api/public/auth/signup': typeof ApiPublicAuthSignupRoute
@@ -112,6 +119,7 @@ export interface FileRoutesByTo {
   '/recap': typeof AuthenticatedRecapRoute
   '/zones': typeof AuthenticatedZonesRoute
   '/': typeof AuthenticatedIndexRoute
+  '/api/public/create-post': typeof ApiPublicCreatePostRoute
   '/api/public/ingest-location': typeof ApiPublicIngestLocationRoute
   '/api/public/register-push-token': typeof ApiPublicRegisterPushTokenRoute
   '/api/public/auth/signup': typeof ApiPublicAuthSignupRoute
@@ -128,6 +136,7 @@ export interface FileRoutesById {
   '/_authenticated/recap': typeof AuthenticatedRecapRoute
   '/_authenticated/zones': typeof AuthenticatedZonesRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
+  '/api/public/create-post': typeof ApiPublicCreatePostRoute
   '/api/public/ingest-location': typeof ApiPublicIngestLocationRoute
   '/api/public/register-push-token': typeof ApiPublicRegisterPushTokenRoute
   '/api/public/auth/signup': typeof ApiPublicAuthSignupRoute
@@ -144,6 +153,7 @@ export interface FileRouteTypes {
     | '/moderate'
     | '/recap'
     | '/zones'
+    | '/api/public/create-post'
     | '/api/public/ingest-location'
     | '/api/public/register-push-token'
     | '/api/public/auth/signup'
@@ -158,6 +168,7 @@ export interface FileRouteTypes {
     | '/recap'
     | '/zones'
     | '/'
+    | '/api/public/create-post'
     | '/api/public/ingest-location'
     | '/api/public/register-push-token'
     | '/api/public/auth/signup'
@@ -173,6 +184,7 @@ export interface FileRouteTypes {
     | '/_authenticated/recap'
     | '/_authenticated/zones'
     | '/_authenticated/'
+    | '/api/public/create-post'
     | '/api/public/ingest-location'
     | '/api/public/register-push-token'
     | '/api/public/auth/signup'
@@ -185,6 +197,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
+  ApiPublicCreatePostRoute: typeof ApiPublicCreatePostRoute
   ApiPublicIngestLocationRoute: typeof ApiPublicIngestLocationRoute
   ApiPublicRegisterPushTokenRoute: typeof ApiPublicRegisterPushTokenRoute
   ApiPublicAuthSignupRoute: typeof ApiPublicAuthSignupRoute
@@ -252,6 +265,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicIngestLocationRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/create-post': {
+      id: '/api/public/create-post'
+      path: '/api/public/create-post'
+      fullPath: '/api/public/create-post'
+      preLoaderRoute: typeof ApiPublicCreatePostRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/cron/push-recaps': {
       id: '/api/public/cron/push-recaps'
       path: '/api/public/cron/push-recaps'
@@ -310,6 +330,7 @@ const AuthenticatedRouteRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
+  ApiPublicCreatePostRoute: ApiPublicCreatePostRoute,
   ApiPublicIngestLocationRoute: ApiPublicIngestLocationRoute,
   ApiPublicRegisterPushTokenRoute: ApiPublicRegisterPushTokenRoute,
   ApiPublicAuthSignupRoute: ApiPublicAuthSignupRoute,
