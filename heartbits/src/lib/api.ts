@@ -177,9 +177,14 @@ export async function togglePostReaction(postId: string) {
 }
 
 export async function fetchWeeklyRecap(): Promise<WeeklyRecapItem | null> {
+  // NOTE: weekly_recaps has no `headline`/`body` columns -- those were never
+  // part of the schema (see `narrative` + the per-metric columns below).
+  // Selecting non-existent columns made this query 400 on every call, which
+  // is why the recap screen never showed anything. Select the real columns
+  // and build headline/body client-side instead.
   const { data, error } = await supabase
     .from('weekly_recaps')
-    .select('id, week_start, body, headline')
+    .select('id, week_start, narrative, top_zone, zones_visited, positive_moments, nearby_moments, crossed_paths')
     .order('week_start', { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -188,7 +193,16 @@ export async function fetchWeeklyRecap(): Promise<WeeklyRecapItem | null> {
     throw error;
   }
 
-  return (data as WeeklyRecapItem | null) ?? null;
+  if (!data) {
+    return null;
+  }
+
+  return {
+    id: data.id,
+    week_start: data.week_start,
+    headline: data.top_zone ? `Your week around ${data.top_zone}` : 'Your week in review',
+    body: data.narrative ?? '',
+  };
 }
 
 export async function registerPushToken(token: string, platform: string) {

@@ -5,11 +5,6 @@ expertMode = true
 [nix]
 channel = "stable-25_05"
 
-[userenv]
-
-[userenv.shared]
-CRON_SECRET = "2e04ba68f85a7a705643c5626378cec7d8b18eb6848ef0f7"
-
 [workflows]
 runButton = "Project"
 
@@ -57,3 +52,10 @@ externalPort = 80
 [[ports]]
 localPort = 8080
 externalPort = 8080
+
+[userenv]
+
+[userenv.shared]
+
+[userenv.development]
+CRON_SECRET = "fee4b69db344f22385b739801959640af9e92017040716fd0de05acdff7e7dfe"

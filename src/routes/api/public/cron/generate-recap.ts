@@ -7,8 +7,16 @@ export const Route = createFileRoute("/api/public/cron/generate-recap")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        const { timingSafeEqual } = await import("node:crypto");
+
         const apikey = request.headers.get("apikey");
-        if (!apikey) return new Response("Forbidden", { status: 403 });
+        const expected = process.env.CRON_SECRET;
+        const isAuthorized =
+          !!apikey &&
+          !!expected &&
+          apikey.length === expected.length &&
+          timingSafeEqual(Buffer.from(apikey), Buffer.from(expected));
+        if (!isAuthorized) return new Response("Forbidden", { status: 403 });
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
