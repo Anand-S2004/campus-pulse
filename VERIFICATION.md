@@ -129,14 +129,31 @@ Two separate bugs were contributing to this — one on the server (never fires o
 production's Monday cron) and one specific to the mobile app (crashes silently on every
 fetch, regardless of day).
 
-### 4a. No way to test the recap without waiting for Monday
+### 4a. Cron endpoint auth was a presence-check, not a real check (security fix)
+
+While adding the test hook below, found `generate-recap.ts` only checked that an `apikey`
+header was *present*, not that it matched the real `CRON_SECRET` — any request with any
+non-empty header value could trigger recap generation. Fixed to a strict, timing-safe
+comparison against `process.env.CRON_SECRET` (mirroring the stricter checks already in
+`generate-pulse.ts` / `push-recaps.ts`). `CRON_SECRET` itself is now generated locally and
+kept only in `.env.local` (git-ignored, loaded automatically by Bun) — it is never written
+to `.replit` or committed to the repo.
+
+```
+$ curl -X POST http://localhost:5000/api/public/cron/generate-recap?testMinutes=1 -H "apikey: wrong-value"
+→ 403 Forbidden
+$ curl -X POST http://localhost:5000/api/public/cron/generate-recap?testMinutes=1 -H "apikey: <real CRON_SECRET>"
+→ {"generated":0,"week_start":"2026-07-12"}
+```
+
+### 4b. No way to test the recap without waiting for Monday
 
 **Fix:** `src/routes/api/public/cron/generate-recap.ts` now accepts an optional
 `?testMinutes=N` query param that aggregates "the last N minutes" instead of "last week",
 for on-demand testing. No query params = unchanged production behavior (real Monday-Sunday
 week, triggered by `pg_cron`).
 
-### 4b. Mobile recap screen never showed data, on any day
+### 4c. Mobile recap screen never showed data, on any day
 
 **Root cause:** `heartbits/src/lib/api.ts` `fetchWeeklyRecap()` selected columns
 `body, headline` from `weekly_recaps` — but that table has no such columns (it has

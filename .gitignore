@@ -20,6 +20,9 @@ dist-ssr
 .wrangler/
 .dev.vars
 
+# Local-only secrets (never committed) -- e.g. CRON_SECRET, loaded automatically by Bun
+.env.local
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
