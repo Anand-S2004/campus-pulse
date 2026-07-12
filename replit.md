@@ -19,11 +19,8 @@ Key mechanics:
   run via `pg_cron` every Monday; supports `?testMinutes=N` for on-demand testing without
   waiting for Monday. Guarded by a `CRON_SECRET` env var checked as the `apikey` header.
 
-See `VERIFICATION.md` for detailed proof that reported bugs (mobile posting, location
-zone-matching, feed reset, weekly recap) are fixed, including one outstanding manual step
-(a `CREATE POLICY` SQL statement the user needs to run directly in the Supabase SQL
-Editor, since the agent only has REST-level Supabase credentials, not a DB connection
-string with DDL privileges).
+See `VERIFICATION.md` for detailed proof that all four reported bugs (mobile posting, location
+zone-matching, feed reset, weekly recap) are now fixed and verified end-to-end.
 
 ## User preferences
 
