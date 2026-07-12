@@ -175,7 +175,7 @@ export default function CreateScreen() {
         {busy ? <View style={styles.progressBar}><View style={[styles.progressFill, { width: `${progress}%` }]} /></View> : null}
         {success ? (
           <Animated.View style={[styles.successBox, { transform: [{ scale: bounce }] }]}> 
-            <Text style={styles.successText}>Shared. It will appear after moderation.</Text>
+            <Text style={styles.successText}>Shared and added to the feed.</Text>
           </Animated.View>
         ) : null}
       </View>

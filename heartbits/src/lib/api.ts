@@ -115,9 +115,24 @@ export async function createPost(input: { description: string; locationLabel: st
     description: input.description,
     location_label: input.locationLabel || 'Campus community',
     category: input.category,
-    status: 'pending',
+    status: 'approved',
   });
 
+  if (error) {
+    throw error;
+  }
+}
+
+export async function resetMyFeed() {
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+  if (userError || !user) {
+    throw new Error('Please sign in before clearing the feed.');
+  }
+
+  const { error } = await supabase.from('posts').delete().eq('user_id', user.id);
   if (error) {
     throw error;
   }
