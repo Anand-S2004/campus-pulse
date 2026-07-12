@@ -3,6 +3,7 @@
 // Use this for admin operations in server functions and server routes only.
 // For user-authenticated queries (with RLS), use the auth middleware instead.
 import { createClient } from '@supabase/supabase-js';
+import ws from 'ws';
 import type { Database } from './types';
 
 function createSupabaseAdminClient() {
@@ -24,7 +25,14 @@ function createSupabaseAdminClient() {
       storage: undefined,
       persistSession: false,
       autoRefreshToken: false,
-    }
+    },
+    // Node 20 (used by this Replit environment) lacks a native WebSocket
+    // constructor that @supabase/realtime-js accepts; provide the `ws`
+    // package explicitly so admin client creation doesn't throw. This admin
+    // client never actually opens a realtime subscription.
+    realtime: {
+      transport: ws as unknown as typeof WebSocket,
+    },
   });
 }
 

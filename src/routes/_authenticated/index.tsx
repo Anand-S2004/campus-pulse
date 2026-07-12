@@ -24,7 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Sparkles, Plus, Clock, XCircle } from "lucide-react";
+import { Sparkles, Plus, Clock, XCircle, Trash2 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/")({
   head: () => ({ meta: [{ title: "Feed · Campus Pulse" }] }),
@@ -215,6 +215,37 @@ function CreatePostDialog({ onCreated }: { onCreated: () => void }) {
   );
 }
 
+function ResetFeedButton({ onReset }: { onReset: () => void }) {
+  const { user } = useAuth();
+  const [busy, setBusy] = useState(false);
+
+  async function handleReset() {
+    if (!user) return;
+    if (!confirm("Delete all of your own posts? This resets your weekly post limit too.")) return;
+    setBusy(true);
+    try {
+      // Mirrors the mobile app's resetMyFeed(): delete only the signed-in
+      // user's own posts, which also clears the weekly-post-limit trigger
+      // since it counts existing rows.
+      const { error } = await supabase.from("posts" as never).delete().eq("user_id" as never, user.id as never);
+      if (error) throw error;
+      toast.success("Your posts were cleared.");
+      onReset();
+    } catch (err) {
+      toast.error((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Button variant="outline" size="sm" className="gap-2" onClick={handleReset} disabled={busy}>
+      <Trash2 className="h-4 w-4" />
+      {busy ? "Clearing…" : "Reset my posts"}
+    </Button>
+  );
+}
+
 function FeedPage() {
   const { user } = useAuth();
   const qc = useQueryClient();
@@ -275,7 +306,10 @@ function FeedPage() {
       {/* Top row: title + create button */}
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Campus Feed</h2>
-        <CreatePostDialog onCreated={invalidate} />
+        <div className="flex items-center gap-2">
+          <ResetFeedButton onReset={invalidate} />
+          <CreatePostDialog onCreated={invalidate} />
+        </div>
       </div>
 
       {/* Community Pulse cards */}

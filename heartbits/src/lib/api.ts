@@ -110,12 +110,15 @@ export async function createPost(input: { description: string; locationLabel: st
     throw new Error('Please sign in before sharing a positive moment.');
   }
 
+  // Posts must be inserted as 'pending' — the RLS policy on public.posts
+  // ("posts self insert") only allows self-inserts with status = 'pending'.
+  // A moderator/admin approves posts afterwards (see the web admin's Moderate page).
   const { error } = await supabase.from('posts').insert({
     user_id: user.id,
     description: input.description,
     location_label: input.locationLabel || 'Campus community',
     category: input.category,
-    status: 'approved',
+    status: 'pending',
   });
 
   if (error) {

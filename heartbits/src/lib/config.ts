@@ -17,7 +17,7 @@ export const SUPABASE_ANON_KEY = readConfigValue(
 );
 export const BACKEND_URL = readConfigValue(
   'EXPO_PUBLIC_BACKEND_URL',
-  'https://project--a47d5318-90cc-49fa-a067-99b4350c777a.lovable.app',
+  'https://15a9513f-c4a6-4db6-b77a-9e999d7106ef-00-10gb4289xv4ip.sisko.replit.dev',
   'BACKEND_URL',
 );
 export const AUTH_REDIRECT_URL = Linking.createURL('/');

@@ -12,14 +12,27 @@ export const Route = createFileRoute("/api/public/cron/generate-recap")({
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-        // Compute last week's Monday → Sunday window.
+        // Testing hook: ?testMinutes=5 generates a recap over the last N minutes
+        // instead of the real Monday→Sunday week, so the feature can be verified
+        // without waiting for an actual week to pass. Never used by the real
+        // pg_cron schedule (it calls this route with no query params).
+        const testMinutes = Number(new URL(request.url).searchParams.get("testMinutes") ?? "");
         const now = new Date();
-        const day = now.getUTCDay(); // 0=Sun, 1=Mon
-        const lastMonday = new Date(now);
-        lastMonday.setUTCDate(now.getUTCDate() - ((day + 6) % 7) - 7);
-        lastMonday.setUTCHours(0, 0, 0, 0);
-        const thisMonday = new Date(lastMonday);
-        thisMonday.setUTCDate(lastMonday.getUTCDate() + 7);
+
+        let lastMonday: Date;
+        let thisMonday: Date;
+        if (Number.isFinite(testMinutes) && testMinutes > 0) {
+          lastMonday = new Date(now.getTime() - testMinutes * 60 * 1000);
+          thisMonday = new Date(now.getTime() + 1000); // include events up to "now"
+        } else {
+          // Compute last week's Monday → Sunday window.
+          const day = now.getUTCDay(); // 0=Sun, 1=Mon
+          lastMonday = new Date(now);
+          lastMonday.setUTCDate(now.getUTCDate() - ((day + 6) % 7) - 7);
+          lastMonday.setUTCHours(0, 0, 0, 0);
+          thisMonday = new Date(lastMonday);
+          thisMonday.setUTCDate(lastMonday.getUTCDate() + 7);
+        }
 
         const fromIso = lastMonday.toISOString();
         const toIso = thisMonday.toISOString();
