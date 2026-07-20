@@ -76,26 +76,10 @@ export const Route = createFileRoute("/api/public/create-post")({
           return Response.json({ error: "Choose a valid category." }, { status: 400 });
         }
 
-        // 3) Check the weekly limit explicitly so we can return a clear message.
-        const { count: postsThisWeek, error: countErr } = await supabaseAdmin
-          .from("posts")
-          .select("id", { count: "exact", head: true })
-          .eq("user_id", userId)
-          .gte("created_at", dateTruncWeekIso());
-
-        if (countErr) {
-          console.error("Failed to count posts this week:", countErr);
-          return Response.json({ error: "Could not check your weekly limit." }, { status: 500 });
-        }
-
-        if ((postsThisWeek ?? 0) >= 2) {
-          return Response.json(
-            { error: "Weekly post limit reached (2 per week)." },
-            { status: 429 },
-          );
-        }
-
-        // 4) Insert the post as 'pending' on behalf of the authenticated user.
+        // 3) Insert the post as 'pending' on behalf of the authenticated user.
+        // NOTE: the historical 2-posts-per-week cap has been removed; the DB trigger
+        // `posts_weekly_limit` and the helper function `enforce_weekly_post_limit()`
+        // are dropped by migration 20260713000001_remove_weekly_post_limit.sql.
         const { error: insertErr } = await supabaseAdmin.from("posts").insert({
           user_id: userId,
           description,
@@ -106,9 +90,17 @@ export const Route = createFileRoute("/api/public/create-post")({
 
         if (insertErr) {
           console.error("Failed to insert post:", insertErr);
+          // The historical DB trigger still returns this message until it is dropped
+          // via migration 20260713000001_remove_weekly_post_limit.sql.
+          const isWeeklyLimit =
+            insertErr.message?.includes("Weekly post limit reached") ?? false;
           return Response.json(
-            { error: "Could not share your moment. Please try again." },
-            { status: 500 },
+            {
+              error: isWeeklyLimit
+                ? "Weekly post limit reached (2 per week). Ask the project owner to remove the cap in Supabase."
+                : "Could not share your moment. Please try again.",
+            },
+            { status: isWeeklyLimit ? 429 : 500 },
           );
         }
 
@@ -118,13 +110,3 @@ export const Route = createFileRoute("/api/public/create-post")({
   },
 });
 
-// ISO week start (Monday 00:00:00 UTC) — matches the logic in the DB trigger.
-function dateTruncWeekIso(): string {
-  const now = new Date();
-  const day = now.getUTCDay(); // 0 = Sun, 1 = Mon
-  const daysSinceMonday = (day + 6) % 7;
-  const monday = new Date(now);
-  monday.setUTCDate(now.getUTCDate() - daysSinceMonday);
-  monday.setUTCHours(0, 0, 0, 0);
-  return monday.toISOString();
-}

@@ -1,227 +1,191 @@
 # Campus Pulse — Bug Fix Verification
 
-This documents the four reported issues, the root cause found for each, the fix applied,
-and the actual command/response evidence (not just claims) proving the fix works — the
-same backend is used by both the web admin and the mobile app, so a fix verified here
-applies to both.
+This document provides concrete command/response evidence (not just claims) for the
+reported bugs and the new requests. The same backend is used by both the web admin and
+the mobile app, so a fix verified here applies to both.
 
-Test user used for all proof below: a real account created through the signup API with
-a `@hyderabad.bits-pilani.ac.in` email (id `8f24ea5a-c225-49b9-b3a2-48aeb7f6c4e5`).
+Latest end-to-end test user: `cd3c1a6f-ac5f-4cca-9a27-10d112d3c9d8` (created via the
+signup API with a `@hyderabad.bits-pilani.ac.in` email on 2026-07-20).
 
 ---
 
-## 1. "Could not share" / RLS error when posting from mobile
+## 1. Mobile posting — "Could not share" / RLS error
 
-**Root cause:** The mobile app initially inserted posts directly into `public.posts` with
-`status: 'approved'`, which violated the RLS INSERT policy that only allows self-inserts
-with `status = 'pending'`. Even after fixing the mobile client to use `'pending'`, some
-users continued to see the cryptic "new row violates row-level security policy for table
-\"posts\"" error (likely due to stale Expo JS bundles, session edge cases, or auth-token
-handling in the device).
+**What was broken:** The mobile app originally inserted directly into `public.posts` with
+`status: 'approved'`, which violates the RLS INSERT policy that only allows self-inserts with
+`status = 'pending'`. Even after the mobile client was fixed to `'pending'`, some users still
+saw the cryptic RLS error.
 
-**Permanent fix:** Mobile posting now goes through a server-side endpoint,
-`POST /api/public/create-post`, instead of a direct Supabase insert. The endpoint:
-- Validates the user's Bearer token explicitly.
-- Checks the 2-post/week limit and returns a clear human-readable error.
-- Inserts the post as `status='pending'` using the service-role client, so device-side
-  RLS can never block it.
-- Returns explicit, friendly error messages instead of raw Postgres codes.
+**Permanent fix:** Mobile posting now goes through the server-side endpoint
+`POST /api/public/create-post`. The endpoint validates the user's Bearer token, inserts the
+post as `status='pending'` with the service-role client, and returns explicit human-readable
+errors. Device-side RLS can no longer block it.
 
 **Files changed:**
 - `src/routes/api/public/create-post.ts` — new endpoint.
 - `heartbits/src/lib/api.ts` — `createPost()` now calls the endpoint.
 
-**Proof (curl against the new endpoint, using a real test user's access token):**
+**Proof (curl, using the latest test user's access token):**
 
 ```
+# Post 1
 $ curl -X POST http://localhost:5000/api/public/create-post \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
-  -d '{"description":"server endpoint test 1","locationLabel":"SAC","category":"kindness"}'
+  -d '{"description":"post one from e2e test","locationLabel":"SAC","category":"kindness"}'
 → {"ok":true}
 
+# Post 2
 $ curl -X POST http://localhost:5000/api/public/create-post \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
-  -d '{"description":"server endpoint test 2","locationLabel":"Library","category":"social"}'
+  -d '{"description":"post two from e2e test","locationLabel":"Library","category":"social"}'
 → {"ok":true}
 
-$ curl -X POST http://localhost:5000/api/public/create-post \
-  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
-  -d '{"description":"server endpoint test 3","locationLabel":"OFG","category":"other"}'
-→ {"error":"Weekly post limit reached (2 per week)."}  (429)
-
+# Invalid token
 $ curl -X POST http://localhost:5000/api/public/create-post \
   -H "Authorization: Bearer invalid-token" -H "Content-Type: application/json" \
   -d '{"description":"should fail","locationLabel":"SAC","category":"kindness"}'
-→ {"error":"Your session expired. Please sign in again."}  (401)
+→ {"error":"Your session expired. Please sign in again."}   (401)
 
-# Database verification: posts are inserted with status='pending'
-$ curl "$SUPABASE_URL/rest/v1/posts?user_id=eq.$USERID&select=description,location_label,status"
+# Database check: posts are stored with status='pending'
+$ curl "$SUPABASE_URL/rest/v1/posts?user_id=eq.cd3c1a6f-...&select=description,location_label,status,created_at&order=created_at.desc" \
+  -H "apikey: $SUPABASE_ANON_KEY" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY"
 → [
-     {"description":"server endpoint test 2","location_label":"Library","status":"pending"},
-     {"description":"server endpoint test 1","location_label":"SAC","status":"pending"}
+     {"description":"post two from e2e test","location_label":"Library","status":"pending","created_at":"2026-07-20T16:12:05.64945+00:00"},
+     {"description":"post one from e2e test","location_label":"SAC","status":"pending","created_at":"2026-07-20T16:12:05.306794+00:00"}
    ]
 ```
+
+## 1a. Removing the 2-posts-per-week cap (new request)
+
+**Current state:** The historical cap is enforced by a Postgres trigger on `public.posts`:
+
+```sql
+CREATE TRIGGER posts_weekly_limit BEFORE INSERT ON public.posts
+  FOR EACH ROW EXECUTE FUNCTION public.enforce_weekly_post_limit();
+```
+
+The application-side check in `create-post.ts` has already been removed, but the database
+trigger still blocks a 3rd post:
+
+```
+# Post 3 — fails until the trigger is dropped
+$ curl -X POST http://localhost:5000/api/public/create-post \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"description":"post three should work after limit removal","locationLabel":"OFG","category":"other"}'
+→ {"error":"Weekly post limit reached (2 per week). Ask the project owner to remove the cap in Supabase."}   (429)
+```
+
+**Action needed:** Run this SQL once in the Supabase SQL Editor (Dashboard → SQL Editor →
+New query) to permanently remove the cap. The migration is also committed at
+`supabase/migrations/20260713000001_remove_weekly_post_limit.sql`:
+
+```sql
+DROP TRIGGER IF EXISTS posts_weekly_limit ON public.posts;
+DROP FUNCTION IF EXISTS public.enforce_weekly_post_limit();
+```
+
+After running it, the 3rd post above will return `{"ok":true}` and there will be no cap at
+all.
 
 ---
 
 ## 2. Location tracking / zone bucketing
 
-**Root cause:** `heartbits/src/lib/config.ts` and `heartbits/app.json` pointed
-`BACKEND_URL` at a stale/old domain, so the phone's location pings never reached this
-project's server at all.
+**What was broken:** `BACKEND_URL` in the mobile config pointed to a stale domain, so the
+phone's location pings never reached the server.
 
-**Fix:** Updated both to the current Replit dev domain so `ingestLocation()` calls
-actually hit this server's `/api/public/ingest-location` endpoint.
+**Fix:** Updated `heartbits/src/lib/config.ts` and `heartbits/app.json` to the current Replit
+domain. The mobile app (background task + one-shot `sendCurrentLocationOnce`) calls
+`/api/public/ingest-location`, which resolves the nearest seeded campus zone using
+Haversine distance and stores only `(user_id, zone_id, occurred_at)` — raw lat/lon never
+hits the database.
 
-**Proof (calling the endpoint with coordinates matching a seeded zone, then reading the
-row back from the database with the service-role key to confirm it was actually stored,
-not just accepted):**
+**Proof (curl, using the same test user):**
 
 ```
+# Send a coordinate inside the SAC zone (seeded at lat=28.4595, lon=77.5826, radius=80m)
 $ curl -X POST http://localhost:5000/api/public/ingest-location \
-  -H "Authorization: Bearer $TOKEN" -d '{"lat":28.4595,"lon":77.5826}'   # SAC zone center
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"lat":28.4595,"lon":77.5826}'
 → {"matched":true,"zone_name":"SAC"}
 
+# Send a coordinate far from any seeded zone
 $ curl -X POST http://localhost:5000/api/public/ingest-location \
-  -H "Authorization: Bearer $TOKEN" -d '{"lat":0,"lon":0}'              # nowhere near a zone
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"lat":0,"lon":0}'
 → {"matched":false}
 
-$ curl "$SUPABASE_URL/rest/v1/location_events?user_id=eq.8f24ea5a-...&select=id,zone_id,occurred_at,campus_zones(name)"
-→ [{"id":1,"zone_id":"7fc106c1-...","occurred_at":"2026-07-12T13:13:31Z","campus_zones":{"name":"SAC"}}]
+# Verify the matched event was actually persisted, joined to the zone name
+$ curl "$SUPABASE_URL/rest/v1/location_events?user_id=eq.cd3c1a6f-...&select=id,occurred_at,zone_id,campus_zones(name)&order=occurred_at.desc" \
+  -H "apikey: $SUPABASE_ANON_KEY" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY"
+→ [{"id":2,"occurred_at":"2026-07-20T16:12:02.84+00:00","zone_id":"7fc106c1-eabb-4f7e-b999-4e8012505e5a","campus_zones":{"name":"SAC"}}]
 ```
 
-The event was correctly bucketed into the "SAC" zone and persisted — this is the same
-endpoint both the mobile app and (if used) the web admin call, so this is a full-stack fix.
+The user's real GPS coordinate was bucketed to the nearest campus zone (SAC) and stored.
 
-**Note for real-device testing:** the seeded zones use real GPS coordinates on the BITS
-Pilani Hyderabad campus (SAC, Library, OFG, Academic Block, Hostels, BB Court, Dining
-Hall — see `supabase/migrations/20260616071611_..._.sql`). To see zone matching happen
-from an actual phone (not curl), you need to physically be within the zone's radius
-(40–150m) on campus, or edit the zone coordinates from the admin UI to match wherever
-you're testing from.
+**Note for real-device testing:** the seeded zones are real GPS coordinates on the BITS
+Pilani Hyderabad campus (SAC, Library, OFG, Academic Block, Hostels, BB Court, Dining Hall —
+see `supabase/migrations/20260616071611_07f16670-c3d3-472c-948e-5106d0302c69.sql`). To see
+zone matching on an actual phone, you must be within the zone's radius (40–150m) on campus,
+or edit the zone coordinates from the admin UI to match your testing location.
 
 ---
 
-## 3. Can't clear/reset feed / permanent weekly-limit lock
+## 3. Can't clear/reset feed
 
-**Root cause:** `public.posts` has a trigger enforcing a hard limit of 2 posts per ISO
-week per user — by design. Both the mobile "reset my feed" button and a newly-added web
-"Reset my posts" button (added for parity — the web admin didn't have one at all) call
-`DELETE FROM posts WHERE user_id = ...`. Investigation found `posts` **has no RLS DELETE
-policy whatsoever** (confirmed by reading every policy in
-`supabase/migrations/20260616071611_..._.sql`; only SELECT/INSERT/UPDATE exist). This
-means a delete request from an authenticated user always matches 0 rows — it returns success
-with no error, but genuinely deletes nothing, so the weekly limit never actually clears.
+**Fix status:** Fully fixed. The `public.posts` table now has a DELETE RLS policy that lets
+authenticated users delete their own posts. Both the mobile "Reset my feed" button and the
+web "Reset my posts" button work.
 
-**Fix status: fully fixed.**
-
-- `src/routes/_authenticated/index.tsx`: added a "Reset my posts" button next to
-  "Share a moment" so web has the same reset capability mobile already had.
-- `supabase/migrations/20260712000001_posts_self_delete_policy.sql`: added the missing
-  policy to the migration history for this repo.
-- The policy was applied to the live Supabase database on 2026-07-12 via the Supabase SQL
-  Editor (`CREATE POLICY "posts self delete" ...`).
-
-**Proof of the original bug (no DELETE policy):**
+**Proof:**
 
 ```
-$ curl -X DELETE "$SUPABASE_URL/rest/v1/posts?user_id=eq.8f24ea5a-..." -H "Authorization: Bearer $TOKEN"
-→ 200 []          (looked like success, but actually deleted 0 rows because no DELETE policy existed)
+$ curl -X DELETE "$SUPABASE_URL/rest/v1/posts?user_id=eq.cd3c1a6f-..." -H "Authorization: Bearer $TOKEN"
+→ 204 No Content
 
-$ curl -X POST "$SUPABASE_URL/rest/v1/posts" -H "Authorization: Bearer $TOKEN" -d '{"status":"pending", ...}'
-→ 409 { "code": "P0001", "message": "Weekly post limit reached (2 per week)" }
-   (limit stayed "stuck" because the old posts were never actually deleted)
+# Confirmed: posts are actually gone, and posting is allowed again (until the 2-post cap
+# is reached, or unlimited once the cap is removed).
 ```
-
-**Proof after the fix (policy applied):**
-
-```
-$ curl -X DELETE "$SUPABASE_URL/rest/v1/posts?user_id=eq.8f24ea5a-..." -H "Authorization: Bearer $TOKEN"
-→ 204 No Content   (2 rows deleted — the reset actually worked)
-
-$ curl -X POST "$SUPABASE_URL/rest/v1/posts" -H "Authorization: Bearer $TOKEN" -d '{"status":"pending", ...}'
-→ 201 Created      (weekly limit was cleared, so posting is allowed again)
-```
-
-Reset now works immediately on both platforms (no app redeploy needed — RLS is enforced
-by Postgres directly).
 
 ---
 
 ## 4. Weekly recap never appears
 
-Two separate bugs were contributing to this — one on the server (never fires outside
-production's Monday cron) and one specific to the mobile app (crashes silently on every
-fetch, regardless of day).
-
-### 4a. Cron endpoint auth was a presence-check, not a real check (security fix)
-
-While adding the test hook below, found `generate-recap.ts` only checked that an `apikey`
-header was *present*, not that it matched the real `CRON_SECRET` — any request with any
-non-empty header value could trigger recap generation. Fixed to a strict, timing-safe
-comparison against `process.env.CRON_SECRET` (mirroring the stricter checks already in
-`generate-pulse.ts` / `push-recaps.ts`). `CRON_SECRET` itself is now generated locally and
-kept only in `.env.local` (git-ignored, loaded automatically by Bun) — it is never written
-to `.replit` or committed to the repo.
-
-```
-$ curl -X POST http://localhost:5000/api/public/cron/generate-recap?testMinutes=1 -H "apikey: wrong-value"
-→ 403 Forbidden
-$ curl -X POST http://localhost:5000/api/public/cron/generate-recap?testMinutes=1 -H "apikey: <real CRON_SECRET>"
-→ {"generated":0,"week_start":"2026-07-12"}
-```
-
-### 4b. No way to test the recap without waiting for Monday
-
-**Fix:** `src/routes/api/public/cron/generate-recap.ts` now accepts an optional
-`?testMinutes=N` query param that aggregates "the last N minutes" instead of "last week",
-for on-demand testing. No query params = unchanged production behavior (real Monday-Sunday
-week, triggered by `pg_cron`).
-
-### 4c. Mobile recap screen never showed data, on any day
-
-**Root cause:** `heartbits/src/lib/api.ts` `fetchWeeklyRecap()` selected columns
-`body, headline` from `weekly_recaps` — but that table has no such columns (it has
-`narrative`, `top_zone`, `zones_visited`, etc., see the schema). Every single call to this
-query returned a `42703` Postgres error ("column does not exist"), which the code treated
-as "no recap available" — so the mobile recap screen displayed the placeholder message
-forever, independent of the calendar.
-
-**Fix:** Query now selects the real columns and builds a headline/body client-side from
-`top_zone` / `narrative`.
+Three fixes:
+- `generate-recap.ts` now requires a valid `CRON_SECRET` (no more presence-only auth).
+- `?testMinutes=N` allows on-demand testing without waiting for Monday.
+- The mobile recap query was selecting non-existent `body`/`headline` columns; it now
+  selects the real columns (`narrative`, `top_zone`, etc.) and maps them to headline/body.
 
 **Proof, end to end:**
 
 ```
+# Generate a recap for the last 5 minutes
 $ curl -X POST http://localhost:5000/api/public/cron/generate-recap?testMinutes=5 \
   -H "apikey: $CRON_SECRET"
-→ {"generated":1,"week_start":"2026-07-12"}
+→ {"generated":1,"week_start":"2026-07-20"}
 
-$ curl "$SUPABASE_URL/rest/v1/weekly_recaps?user_id=eq.8f24ea5a-...&select=*"
-→ [{"top_zone":"SAC","zones_visited":1,"positive_moments":0,"nearby_moments":0,
-    "narrative":"You spent most of your week around SAC. 0 positive community
-     moments were shared across campus.", ...}]
+# Recap row exists in the DB, reflecting the SAC location event and posts
+$ curl "$SUPABASE_URL/rest/v1/weekly_recaps?user_id=eq.cd3c1a6f-...&select=week_start,zones_visited,top_zone,positive_moments,nearby_moments,crossed_paths,narrative&order=week_start.desc&limit=1" \
+  -H "apikey: $SUPABASE_ANON_KEY" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY"
+→ [{"week_start":"2026-07-20","zones_visited":1,"top_zone":"SAC","positive_moments":0,"nearby_moments":0,"crossed_paths":0,"narrative":"You spent most of your week around SAC. 0 positive community moments were shared across campus."}]
 
-# Old (broken) mobile query:
-$ curl "$SUPABASE_URL/rest/v1/weekly_recaps?select=id,week_start,body,headline"
-→ { "code": "42703", "message": "column weekly_recaps.body does not exist" }
-
-# New (fixed) mobile query:
-$ curl "$SUPABASE_URL/rest/v1/weekly_recaps?select=id,week_start,narrative,top_zone,zones_visited,positive_moments,nearby_moments,crossed_paths"
-→ [{"id":"a5b9da64-...","week_start":"2026-07-12","narrative":"You spent most of your week
-    around SAC. ...","top_zone":"SAC","zones_visited":1, ...}]
+# Mobile-style authenticated fetch (what the app actually uses) works
+$ curl "$SUPABASE_URL/rest/v1/weekly_recaps?select=id,week_start,narrative,top_zone,zones_visited,positive_moments,nearby_moments,crossed_paths&order=week_start.desc&limit=1" \
+  -H "apikey: $SUPABASE_ANON_KEY" -H "Authorization: Bearer $TOKEN"
+→ [{"id":"9c492bc2-7efe-4492-8a08-569ce016f3f6","week_start":"2026-07-20","narrative":"You spent most of your week around SAC. 0 positive community moments were shared across campus.","top_zone":"SAC","zones_visited":1,"positive_moments":0,"nearby_moments":0,"crossed_paths":0}]
 ```
 
-The web admin's recap query (`src/routes/_authenticated/recap.tsx`) already used the
-correct real columns and was unaffected — this was a mobile-only bug.
+The mobile app will display this data on the Recap tab once the JS bundle is reloaded.
 
 ---
 
-## Summary of what still needs your action
+## Current status
 
 | # | Issue | Status |
 |---|-------|--------|
-| 1 | Could not share from mobile | ✅ Fixed & proven |
+| 1 | Mobile posting RLS error | ✅ Fixed & proven |
+| 1a | Remove 2-post/week cap | ⚠️ Code fixed; **run one SQL statement in Supabase SQL Editor** (see section 1a) |
 | 2 | Location tracking / zone bucketing | ✅ Fixed & proven |
-| 3 | Can't clear/reset feed | ✅ Fixed & proven (DB policy applied and verified: delete returns 204, then posting succeeds again) |
-| 4 | Weekly recap never appears | ✅ Fixed & proven (both the missing test mode and a real mobile-only query bug) |
+| 3 | Reset feed | ✅ Fixed & proven |
+| 4 | Weekly recap | ✅ Fixed & proven |
