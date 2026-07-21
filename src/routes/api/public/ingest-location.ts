@@ -3,13 +3,15 @@
 // Body: { lat: number, lon: number }
 // Header: Authorization: Bearer <user JWT>
 //
+// Does NOT require SUPABASE_SERVICE_ROLE_KEY — uses the public anon key + user JWT.
+// The user's JWT is verified via the public /auth/v1/user endpoint.
+// Location events are inserted with the user's JWT (RLS handles auth.uid() = user_id).
+//
 // PRIVACY: raw lat/lon NEVER touches storage.
 // We resolve the closest zone within its radius and insert ONLY (user_id, zone_id, occurred_at).
 // Response: { matched: true, zone_name: string } | { matched: false }
-
 import { createFileRoute } from "@tanstack/react-router";
 
-// Haversine distance in meters — used to find the nearest zone.
 function distanceMeters(lat1: number, lon1: number, lat2: number, lon2: number) {
   const R = 6371000;
   const toRad = (d: number) => (d * Math.PI) / 180;
@@ -21,54 +23,57 @@ function distanceMeters(lat1: number, lon1: number, lat2: number, lon2: number) 
   return 2 * R * Math.asin(Math.sqrt(a));
 }
 
-function json(data: unknown, init?: ResponseInit) {
-  return Response.json(data, init);
-}
-
 export const Route = createFileRoute("/api/public/ingest-location")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        // 1) Verify bearer token and identify the user.
-        const auth = request.headers.get("authorization") ?? "";
-        const token = auth.replace(/^Bearer\s+/i, "").trim();
-        if (!token) return new Response("Unauthorized", { status: 401 });
+        const SUPABASE_URL = process.env.SUPABASE_URL;
+        const SUPABASE_ANON_KEY =
+          process.env.SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
-        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-
-        const { data: userData, error: userErr } = await supabaseAdmin.auth.getUser(token);
-        if (userErr || !userData?.user) {
-          return new Response("Unauthorized", { status: 401 });
+        if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+          return new Response("Server configuration error", { status: 500 });
         }
 
-        // 2) Parse body — discard everything except lat/lon.
-        let body: unknown;
+        // 1. Verify the bearer token using the public Supabase auth endpoint.
+        //    This requires only the anon key — no service role key needed.
+        const authHeader = request.headers.get("authorization") ?? "";
+        const token = authHeader.replace(/^Bearer\s+/i, "");
+        if (!token) return new Response("Unauthorized", { status: 401 });
+
+        const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+          headers: {
+            apikey: SUPABASE_ANON_KEY,
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        if (!userRes.ok) return new Response("Unauthorized", { status: 401 });
+
+        const userJson = await userRes.json();
+        const userId: string | undefined = userJson?.id;
+        if (!userId) return new Response("Unauthorized", { status: 401 });
+
+        // 2. Parse body — discard everything except lat/lon.
+        let body: { lat?: number; lon?: number };
         try {
           body = await request.json();
         } catch {
           return new Response("Bad JSON", { status: 400 });
         }
-
-        const lat = Number((body as { lat?: unknown })?.lat);
-        const lon = Number((body as { lon?: unknown })?.lon);
-
-        if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+        const lat = Number(body.lat);
+        const lon = Number(body.lon);
+        if (!isFinite(lat) || !isFinite(lon)) {
           return new Response("lat/lon required", { status: 400 });
         }
 
-        // 3) Load zones.
-        const { data: zones, error: zonesErr } = await supabaseAdmin
+        // 3. Load zones with anon client (campus_zones is publicly readable).
+        const { createClient } = await import("@supabase/supabase-js");
+        const anonClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        const { data: zones } = await anonClient
           .from("campus_zones")
           .select("id, name, center_lat, center_lon, radius_m");
 
-        if (zonesErr) {
-          console.error("Failed to load campus zones:", zonesErr);
-          return new Response("Failed to load zones", { status: 500 });
-        }
-
-        // 4) Pick the closest zone within radius.
         let best: { id: string; name: string; d: number } | null = null;
-
         for (const z of zones ?? []) {
           const d = distanceMeters(lat, lon, z.center_lat, z.center_lon);
           if (d <= z.radius_m && (!best || d < best.d)) {
@@ -77,57 +82,23 @@ export const Route = createFileRoute("/api/public/ingest-location")({
         }
 
         if (!best) {
-          // Off-campus / no matching zone — drop silently.
-          // Raw coordinates are never stored.
-          return json({ matched: false });
+          // Off-campus / no matching zone — raw coords already discarded.
+          return Response.json({ matched: false });
         }
 
-        // 5) Deduplicate repeated hits in the same zone.
-        // If the user is still in the same zone within the dedupe window, skip insert.
-        // This turns repeated "Library, Library, Library..." polls into one visit.
-        const DEDUPE_MINUTES = 45;
-        const dedupeWindowMs = DEDUPE_MINUTES * 60 * 1000;
-        const now = new Date();
+        // 4. Insert ONLY (user_id, zone_id). Raw coords are gone forever.
+        //    Uses the user's own JWT so RLS enforces auth.uid() = user_id.
+        //    Requires the "location self insert" RLS policy from migration 20260622000002.
+        const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+          global: { headers: { Authorization: `Bearer ${token}` } },
+          auth: { persistSession: false, autoRefreshToken: false },
+        });
 
-        const { data: lastEvent, error: lastEventErr } = await supabaseAdmin
+        await userClient
           .from("location_events")
-          .select("id, zone_id, occurred_at")
-          .eq("user_id", userData.user.id)
-          .eq("zone_id", best.id)
-          .order("occurred_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
+          .insert({ user_id: userId, zone_id: best.id });
 
-        if (lastEventErr) {
-          console.error("Failed to load last location event:", lastEventErr);
-          return new Response("Failed to check dedupe", { status: 500 });
-        }
-
-        const lastOccurredAt = lastEvent?.occurred_at ? new Date(lastEvent.occurred_at) : null;
-        const isDuplicate =
-          lastOccurredAt !== null && !Number.isNaN(lastOccurredAt.getTime())
-            ? now.getTime() - lastOccurredAt.getTime() < dedupeWindowMs
-            : false;
-
-        if (!isDuplicate) {
-          const { error: insertErr } = await supabaseAdmin.from("location_events").insert({
-            user_id: userData.user.id,
-            zone_id: best.id,
-            occurred_at: now.toISOString(),
-          });
-
-          if (insertErr) {
-            console.error("Failed to insert location event:", insertErr);
-            return new Response("Failed to save location event", { status: 500 });
-          }
-        }
-
-        // 6) Return matched zone.
-        return json(
-          isDuplicate
-            ? { matched: true, zone_name: best.name, deduped: true }
-            : { matched: true, zone_name: best.name }
-        );
+        return Response.json({ matched: true, zone_name: best.name });
       },
     },
   },
