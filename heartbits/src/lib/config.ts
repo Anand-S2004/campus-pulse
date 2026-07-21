@@ -9,15 +9,15 @@ const readConfigValue = (publicName: string, fallback: string, legacyName?: stri
   return value?.trim() ? value : fallback;
 };
 
-export const SUPABASE_URL = readConfigValue('EXPO_PUBLIC_SUPABASE_URL', 'https://zmjkkasiihycuutikims.supabase.co', 'SUPABASE_URL');
+export const SUPABASE_URL = readConfigValue('EXPO_PUBLIC_SUPABASE_URL', 'https://mtqyrbyudtduyoqtumlt.supabase.co', 'SUPABASE_URL');
 export const SUPABASE_ANON_KEY = readConfigValue(
   'EXPO_PUBLIC_SUPABASE_ANON_KEY',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJzdXBhYmFzZS1yb290LWdvYWwiLCJhcHAiOiJhdXRoLXNlcnZpY2UiLCJleHAiOjM5OTk5OTk5OTl9.zZ1jQX8cQn4lP95f4gq0qg0X5uZ2lD0ySw5D2m2A9L4g',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im10cXlyYnl1ZHRkdXlvcXR1bWx0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1OTA3MzAsImV4cCI6MjA5NzE2NjczMH0.2IztZH7Qif4VKYwTgxVRup0Q2HtRb8HlcHeyJ_aHVA8',
   'SUPABASE_ANON_KEY',
 );
 export const BACKEND_URL = readConfigValue(
   'EXPO_PUBLIC_BACKEND_URL',
-  'https://15a9513f-c4a6-4db6-b77a-9e999d7106ef-00-10gb4289xv4ip.sisko.replit.dev',
+  'https://6b387340-0efc-40fb-aafc-c46708c89e03-00-1327hnc5xtsxn.pike.replit.dev',
   'BACKEND_URL',
 );
 export const AUTH_REDIRECT_URL = Linking.createURL('/');
