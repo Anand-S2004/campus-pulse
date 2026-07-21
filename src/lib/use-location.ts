@@ -1,3 +1,9 @@
+// Web location tracking hook.
+// Polls the browser's Geolocation API every 5 min and posts to /api/public/ingest-location.
+// Handles permission-denied / unsupported / timeout gracefully.
+// Background sync via the Periodic Background Sync API (Chrome only, best-effort).
+// NOTE: When the browser tab is closed, location updates stop. For continuous background
+// tracking (even when device screen is off), use the companion Expo mobile app.
 import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -9,347 +15,164 @@ export type LocationStatus =
   | "unsupported"
   | "error";
 
-const POLL_MS = 5 * 60 * 1000;
+const POLL_MS = 5 * 60 * 1000; // 5 minutes
 const STORAGE_KEY = "cp-location-tracking";
+const LAST_ZONE_KEY = "cp-last-zone";
+
+type GeoPosition = { latitude: number; longitude: number };
 
 export function useLocation() {
   const [status, setStatus] = useState<LocationStatus>("idle");
-  const [currentZone, setCurrentZone] = useState<string | null>(null);
+  const [currentZone, setCurrentZone] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    return localStorage.getItem(LAST_ZONE_KEY);
+  });
   const [locationError, setLocationError] = useState<string | null>(null);
+  const [lastPing, setLastPing] = useState<string | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const mountedRef = useRef(true);
-
-  const clearTrackingInterval = useCallback(() => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
+  const pingServer = useCallback(async (coords: GeoPosition) => {
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session) return;
+      const res = await fetch("/api/public/ingest-location", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ lat: coords.latitude, lon: coords.longitude }),
+      });
+      if (res.ok) {
+        const j = await res.json();
+        const zone = j.zone_name ?? null;
+        setCurrentZone(zone);
+        if (zone) localStorage.setItem(LAST_ZONE_KEY, zone);
+        else localStorage.removeItem(LAST_ZONE_KEY);
+        setLastPing(new Date().toLocaleTimeString());
+      } else {
+        const text = await res.text().catch(() => "unknown");
+        console.warn("[location] ingest failed:", text);
+      }
+    } catch (e) {
+      console.warn("[location] network error:", e);
     }
   }, []);
 
-  const stopTracking = useCallback(() => {
-    clearTrackingInterval();
-
-    if (typeof window !== "undefined") {
-      localStorage.removeItem(STORAGE_KEY);
-    }
-
-    if (!mountedRef.current) return;
-
-    setStatus("idle");
-    setCurrentZone(null);
-  }, [clearTrackingInterval]);
-
-  const sendLocation = useCallback(
-    async (lat: number, lon: number) => {
-      try {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-
-        if (!session) {
-          stopTracking();
-          return;
-        }
-
-        const response = await fetch("/api/public/ingest-location", {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            authorization: `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({
-            lat,
-            lon,
-          }),
-        });
-
-        if (!response.ok) {
-          return;
-        }
-
-        const payload = await response.json();
-
-        if (!mountedRef.current) return;
-
-        setCurrentZone(payload.zone_name ?? null);
-      } catch {
-        // Retry next cycle
-      }
-    },
-    [stopTracking],
-  );
-
   const pingLocation = useCallback(async () => {
-    if (!navigator.geolocation) {
-      if (mountedRef.current) {
-        setStatus("unsupported");
-      }
-      return;
-    }
-
+    if (!navigator.geolocation) return;
     return new Promise<void>((resolve) => {
       navigator.geolocation.getCurrentPosition(
         async ({ coords }) => {
-          await sendLocation(coords.latitude, coords.longitude);
+          await pingServer({ latitude: coords.latitude, longitude: coords.longitude });
           resolve();
         },
         (err) => {
-          if (!mountedRef.current) {
-            resolve();
-            return;
+          if (err.code === err.PERMISSION_DENIED) {
+            setStatus("denied");
+            setLocationError(
+              "Location access was denied. Enable it in your browser settings.",
+            );
+            setCurrentZone(null);
+            localStorage.removeItem(STORAGE_KEY);
+            localStorage.removeItem(LAST_ZONE_KEY);
+            if (timerRef.current) {
+              clearInterval(timerRef.current);
+              timerRef.current = null;
+            }
           }
-
-          switch (err.code) {
-            case err.PERMISSION_DENIED:
-              setStatus("denied");
-              setLocationError(
-                "Location access was denied. Enable it in browser settings.",
-              );
-              setCurrentZone(null);
-
-              clearTrackingInterval();
-
-              if (typeof window !== "undefined") {
-                localStorage.removeItem(STORAGE_KEY);
-              }
-              break;
-
-            case err.POSITION_UNAVAILABLE:
-              setLocationError(
-                "Location information is currently unavailable.",
-              );
-              break;
-
-            case err.TIMEOUT:
-              setLocationError(
-                "Location request timed out. Will retry automatically.",
-              );
-              break;
-
-            default:
-              setLocationError(
-                "Could not retrieve location.",
-              );
-          }
-
           resolve();
         },
-        {
-          enableHighAccuracy: false,
-          timeout: 15000,
-          maximumAge: 2 * 60 * 1000,
-        },
+        { timeout: 10000, maximumAge: 60000 },
       );
     });
-  }, [clearTrackingInterval, sendLocation]);
-
-  const startPolling = useCallback(() => {
-    clearTrackingInterval();
-
-    intervalRef.current = setInterval(() => {
-      pingLocation();
-    }, POLL_MS);
-  }, [clearTrackingInterval, pingLocation]);
+  }, [pingServer]);
 
   const startTracking = useCallback(async () => {
-    if (!navigator.geolocation) {
+    if (!("geolocation" in navigator)) {
       setStatus("unsupported");
+      setLocationError("Your browser doesn't support location sharing.");
       return;
     }
-
     setStatus("requesting");
     setLocationError(null);
 
     await new Promise<void>((resolve) => {
       navigator.geolocation.getCurrentPosition(
         async ({ coords }) => {
-          if (!mountedRef.current) {
-            resolve();
-            return;
-          }
-
           setStatus("tracking");
-
-          if (typeof window !== "undefined") {
-            localStorage.setItem(STORAGE_KEY, "1");
-          }
-
-          await sendLocation(
-            coords.latitude,
-            coords.longitude,
-          );
-
-          startPolling();
-
+          localStorage.setItem(STORAGE_KEY, "1");
+          await pingServer({ latitude: coords.latitude, longitude: coords.longitude });
+          timerRef.current = setInterval(pingLocation, POLL_MS);
           try {
             if ("serviceWorker" in navigator) {
-              const registration =
-                await navigator.serviceWorker.ready;
-
-              const periodicSync =
-                (registration as any).periodicSync;
-
-              if (
-                periodicSync &&
-                typeof periodicSync.register === "function"
-              ) {
-                await periodicSync.register(
-                  "cp-location-update",
-                  {
-                    minInterval: POLL_MS,
-                  },
-                );
+              const reg = await navigator.serviceWorker.ready;
+              if ("periodicSync" in reg) {
+                await (
+                  reg as unknown as {
+                    periodicSync: {
+                      register: (tag: string, opts: object) => Promise<void>;
+                    };
+                  }
+                ).periodicSync.register("cp-location-update", {
+                  minInterval: POLL_MS,
+                });
               }
             }
-          } catch {
-            // Ignore unsupported browsers
-          }
-
+          } catch { /* not supported or permission denied */ }
           resolve();
         },
         (err) => {
-          if (!mountedRef.current) {
-            resolve();
-            return;
-          }
-
           if (err.code === err.PERMISSION_DENIED) {
             setStatus("denied");
             setLocationError(
-              "Location access denied. Enable it in browser settings.",
+              "Location access was denied. Enable it in your browser settings to share your zone.",
             );
+          } else if (err.code === err.POSITION_UNAVAILABLE) {
+            setStatus("error");
+            setLocationError("Your location is unavailable right now.");
           } else {
             setStatus("error");
-            setLocationError(
-              "Could not obtain location.",
-            );
+            setLocationError("Could not get your location. Please try again.");
           }
-
           resolve();
         },
-        {
-          enableHighAccuracy: false,
-          timeout: 15000,
-          maximumAge: 60000,
-        },
+        { timeout: 15000, enableHighAccuracy: false },
       );
     });
-  }, [sendLocation, startPolling]);
+  }, [pingServer, pingLocation]);
 
+  const stopTracking = useCallback(() => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    setStatus("idle");
+    setCurrentZone(null);
+    setLastPing(null);
+    setLocationError(null);
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(LAST_ZONE_KEY);
+  }, []);
+
+  // Auto-restart tracking if the user previously enabled it
   useEffect(() => {
-    mountedRef.current = true;
-
-    if (
-      typeof window !== "undefined" &&
-      localStorage.getItem(STORAGE_KEY) === "1"
-    ) {
+    if (localStorage.getItem(STORAGE_KEY) === "1") {
       startTracking();
     }
-
-    const visibilityHandler = () => {
-      if (
-        document.visibilityState === "visible" &&
-        localStorage.getItem(STORAGE_KEY) === "1"
-      ) {
-        pingLocation();
-      }
-    };
-
-    const onlineHandler = () => {
-      if (
-        localStorage.getItem(STORAGE_KEY) === "1"
-      ) {
-        pingLocation();
-      }
-    };
-
-    const serviceWorkerHandler = (e: MessageEvent) => {
+    const handleSwMsg = (e: MessageEvent) => {
       if (e.data?.type === "cp-location-update") {
         pingLocation();
       }
     };
-
-    document.addEventListener(
-      "visibilitychange",
-      visibilityHandler,
-    );
-
-    window.addEventListener(
-      "online",
-      onlineHandler,
-    );
-
-    navigator.serviceWorker?.addEventListener(
-      "message",
-      serviceWorkerHandler,
-    );
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(
-      (event) => {
-        if (event === "SIGNED_OUT") {
-          stopTracking();
-        }
-      },
-    );
-
-    if (
-      navigator.permissions &&
-      navigator.permissions.query
-    ) {
-      navigator.permissions
-        .query({
-          name: "geolocation" as PermissionName,
-        })
-        .then((permission) => {
-          permission.onchange = () => {
-            if (
-              permission.state === "denied"
-            ) {
-              stopTracking();
-              setStatus("denied");
-            }
-          };
-        })
-        .catch(() => {});
-    }
-
+    navigator.serviceWorker?.addEventListener("message", handleSwMsg);
     return () => {
-      mountedRef.current = false;
-
-      clearTrackingInterval();
-
-      subscription.unsubscribe();
-
-      document.removeEventListener(
-        "visibilitychange",
-        visibilityHandler,
-      );
-
-      window.removeEventListener(
-        "online",
-        onlineHandler,
-      );
-
-      navigator.serviceWorker?.removeEventListener(
-        "message",
-        serviceWorkerHandler,
-      );
+      if (timerRef.current) clearInterval(timerRef.current);
+      navigator.serviceWorker?.removeEventListener("message", handleSwMsg);
     };
-  }, [
-    startTracking,
-    pingLocation,
-    stopTracking,
-    clearTrackingInterval,
-  ]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  return {
-    status,
-    currentZone,
-    locationError,
-    startTracking,
-    stopTracking,
-  };
+  return { status, currentZone, locationError, lastPing, startTracking, stopTracking };
 }

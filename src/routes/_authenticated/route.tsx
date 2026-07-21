@@ -6,7 +6,7 @@ import { useLocation } from "@/lib/use-location";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { MapPin, MapPinOff, Loader2 } from "lucide-react";
+import { MapPin, MapPinOff, Loader2, Radio } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -16,7 +16,7 @@ export const Route = createFileRoute("/_authenticated")({
 function AuthedLayout() {
   const { user, role, loading } = useAuth();
   const nav = useNavigate();
-  const { status, currentZone, locationError, startTracking, stopTracking } = useLocation();
+  const { status, currentZone, locationError, lastPing, startTracking, stopTracking } = useLocation();
 
   if (loading) return <div className="p-8 text-muted-foreground">Loading…</div>;
   if (!user) {
@@ -75,6 +75,7 @@ function AuthedLayout() {
             <LocationButton
               status={status}
               currentZone={currentZone}
+              lastPing={lastPing}
               onStart={startTracking}
               onStop={stopTracking}
             />
@@ -112,11 +113,13 @@ function AuthedLayout() {
 function LocationButton({
   status,
   currentZone,
+  lastPing,
   onStart,
   onStop,
 }: {
   status: ReturnType<typeof useLocation>["status"];
   currentZone: string | null;
+  lastPing: string | null;
   onStart: () => void;
   onStop: () => void;
 }) {
@@ -135,11 +138,11 @@ function LocationButton({
     return (
       <button
         onClick={onStop}
-        title="Click to stop sharing location"
-        className="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/30"
+        title={lastPing ? `Last update: ${lastPing}` : "Click to stop sharing location"}
+        className="flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-400"
       >
-        <MapPin className="h-3 w-3" />
-        {currentZone ?? "On campus"}
+        <Radio className="h-3 w-3 animate-pulse" />
+        {currentZone ? `In ${currentZone}` : "On campus"}
       </button>
     );
   }
@@ -151,6 +154,7 @@ function LocationButton({
         className="flex items-center gap-1 text-xs text-muted-foreground"
       >
         <MapPinOff className="h-3 w-3" />
+        Location off
       </span>
     );
   }

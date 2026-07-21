@@ -24,14 +24,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Sparkles, Plus, Clock, XCircle, Trash2 } from "lucide-react";
+import { Sparkles, Plus, Clock, XCircle } from "lucide-react";
+import type { Database } from "@/integrations/supabase/types";
 
 export const Route = createFileRoute("/_authenticated/")({
   head: () => ({ meta: [{ title: "Feed · Campus Pulse" }] }),
   component: FeedPage,
 });
 
-const CATEGORY_ICON: Record<string, string> = {
+type PostCategory = Database["public"]["Enums"]["post_category"];
+
+const CATEGORY_ICON: Record<PostCategory | string, string> = {
   sports: "🏀",
   kindness: "🐕",
   academic: "📚",
@@ -41,7 +44,7 @@ const CATEGORY_ICON: Record<string, string> = {
   other: "✨",
 };
 
-const CATEGORIES = [
+const CATEGORIES: PostCategory[] = [
   "sports",
   "kindness",
   "academic",
@@ -49,9 +52,9 @@ const CATEGORIES = [
   "music",
   "social",
   "other",
-] as const;
+];
 
-type Post = {
+type FeedPost = {
   id: string;
   category: string;
   location_label: string;
@@ -68,7 +71,7 @@ function CreatePostDialog({ onCreated }: { onCreated: () => void }) {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [category, setCategory] = useState("");
+  const [category, setCategory] = useState<PostCategory | "">("");
   const [description, setDescription] = useState("");
   const [locationLabel, setLocationLabel] = useState("");
   const [zoneId, setZoneId] = useState("");
@@ -77,9 +80,9 @@ function CreatePostDialog({ onCreated }: { onCreated: () => void }) {
     queryKey: ["campus-zones"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("campus_zones" as never)
+        .from("campus_zones")
         .select("id, name")
-        .order("name" as never, { ascending: true });
+        .order("name", { ascending: true });
       if (error) throw error;
       return (data ?? []) as Zone[];
     },
@@ -92,21 +95,15 @@ function CreatePostDialog({ onCreated }: { onCreated: () => void }) {
     if (!locationLabel.trim()) { toast.error("Add a location label."); return; }
     setBusy(true);
     try {
-      const { error } = await supabase.from("posts" as never).insert({
+      const { error } = await supabase.from("posts").insert({
         user_id: user!.id,
         category,
         description: description.trim(),
         location_label: locationLabel.trim(),
         zone_id: zoneId || null,
         status: "pending",
-      } as never);
-      if (error) {
-        // Friendly message for the weekly-limit trigger
-        if (error.message.includes("Weekly post limit")) {
-          throw new Error("You've reached your 2 posts/week limit. Try again next week!");
-        }
-        throw error;
-      }
+      });
+      if (error) throw error;
       toast.success("Moment shared! It'll appear after review.");
       setOpen(false);
       setCategory("");
@@ -136,7 +133,7 @@ function CreatePostDialog({ onCreated }: { onCreated: () => void }) {
         <form onSubmit={submit} className="space-y-4">
           <div className="space-y-2">
             <Label>Category</Label>
-            <Select value={category} onValueChange={setCategory} required>
+            <Select value={category} onValueChange={(v) => setCategory(v as PostCategory)}>
               <SelectTrigger>
                 <SelectValue placeholder="Pick a category…" />
               </SelectTrigger>
@@ -198,7 +195,7 @@ function CreatePostDialog({ onCreated }: { onCreated: () => void }) {
           </div>
 
           <p className="text-xs text-muted-foreground">
-            Posts are reviewed before appearing in the feed. Limit: 2 per week.
+            Posts are reviewed before appearing in the feed.
           </p>
 
           <div className="flex justify-end gap-2">
@@ -215,84 +212,50 @@ function CreatePostDialog({ onCreated }: { onCreated: () => void }) {
   );
 }
 
-function ResetFeedButton({ onReset }: { onReset: () => void }) {
-  const { user } = useAuth();
-  const [busy, setBusy] = useState(false);
-
-  async function handleReset() {
-    if (!user) return;
-    if (!confirm("Delete all of your own posts? This resets your weekly post limit too.")) return;
-    setBusy(true);
-    try {
-      // Mirrors the mobile app's resetMyFeed(): delete only the signed-in
-      // user's own posts, which also clears the weekly-post-limit trigger
-      // since it counts existing rows.
-      const { error } = await supabase.from("posts" as never).delete().eq("user_id" as never, user.id as never);
-      if (error) throw error;
-      toast.success("Your posts were cleared.");
-      onReset();
-    } catch (err) {
-      toast.error((err as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <Button variant="outline" size="sm" className="gap-2" onClick={handleReset} disabled={busy}>
-      <Trash2 className="h-4 w-4" />
-      {busy ? "Clearing…" : "Reset my posts"}
-    </Button>
-  );
-}
-
 function FeedPage() {
   const { user } = useAuth();
   const qc = useQueryClient();
 
-  // Community Pulse cards
   const pulse = useQuery({
     queryKey: ["pulse"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("pulse_cards" as never)
+        .from("pulse_cards")
         .select("id, body, kind, generated_for")
-        .order("generated_for" as never, { ascending: false })
+        .order("generated_for", { ascending: false })
         .limit(3);
       if (error) throw error;
-      return (data ?? []) as Array<{ id: string; body: string; kind: string }>;
+      return data ?? [];
     },
   });
 
-  // Approved posts — full community feed
   const posts = useQuery({
     queryKey: ["posts-feed"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("posts" as never)
+        .from("posts")
         .select("id, category, location_label, description, created_at, status, user_id, profiles(display_name)")
-        .eq("status" as never, "approved" as never)
-        .order("created_at" as never, { ascending: false })
+        .eq("status", "approved")
+        .order("created_at", { ascending: false })
         .limit(50);
       if (error) throw error;
-      return (data ?? []) as Post[];
+      return (data ?? []) as unknown as FeedPost[];
     },
   });
 
-  // User's own pending / rejected posts
   const myPending = useQuery({
     queryKey: ["my-posts"],
     enabled: !!user,
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("posts" as never)
+        .from("posts")
         .select("id, category, location_label, description, created_at, status")
-        .eq("user_id" as never, user!.id as never)
-        .in("status" as never, ["pending", "rejected"] as never)
-        .order("created_at" as never, { ascending: false })
+        .eq("user_id", user!.id)
+        .in("status", ["pending", "rejected"])
+        .order("created_at", { ascending: false })
         .limit(20);
       if (error) throw error;
-      return (data ?? []) as Post[];
+      return data ?? [];
     },
   });
 
@@ -303,16 +266,11 @@ function FeedPage() {
 
   return (
     <div className="space-y-5">
-      {/* Top row: title + create button */}
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Campus Feed</h2>
-        <div className="flex items-center gap-2">
-          <ResetFeedButton onReset={invalidate} />
-          <CreatePostDialog onCreated={invalidate} />
-        </div>
+        <CreatePostDialog onCreated={invalidate} />
       </div>
 
-      {/* Community Pulse cards */}
       {pulse.data && pulse.data.length > 0 && (
         <div className="grid gap-2 sm:grid-cols-3">
           {pulse.data.map((p) => (
@@ -328,7 +286,6 @@ function FeedPage() {
         </div>
       )}
 
-      {/* User's own pending / rejected posts */}
       {myPending.data && myPending.data.length > 0 && (
         <div className="space-y-2">
           <h3 className="text-sm font-medium text-muted-foreground">My submissions</h3>
@@ -361,11 +318,8 @@ function FeedPage() {
         </div>
       )}
 
-      {/* Approved post feed */}
       <div className="space-y-3">
-        {posts.isLoading && (
-          <div className="text-muted-foreground">Loading feed…</div>
-        )}
+        {posts.isLoading && <div className="text-muted-foreground">Loading feed…</div>}
         {!posts.isLoading && posts.data?.length === 0 && (
           <div className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
             <p>No moments yet.</p>
@@ -378,9 +332,7 @@ function FeedPage() {
               <div className="text-2xl">{CATEGORY_ICON[p.category] ?? "✨"}</div>
               <div className="flex-1">
                 <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                  <Badge variant="secondary" className="capitalize">
-                    {p.category}
-                  </Badge>
+                  <Badge variant="secondary" className="capitalize">{p.category}</Badge>
                   {p.location_label && <span>📍 {p.location_label}</span>}
                   <span>·</span>
                   <span>{new Date(p.created_at).toLocaleString()}</span>
