@@ -52,3 +52,22 @@ CREATE POLICY "location admin read" ON public.location_events
 -- 5. Remove the weekly post limit
 DROP TRIGGER IF EXISTS posts_weekly_limit ON public.posts;
 DROP FUNCTION IF EXISTS public.enforce_weekly_post_limit();
+
+-- 6. Allow users to read/upsert their own weekly recaps (used by /api/public/my-recap)
+ALTER TABLE public.weekly_recaps ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "weekly_recaps self select" ON public.weekly_recaps;
+CREATE POLICY "weekly_recaps self select" ON public.weekly_recaps
+  FOR SELECT TO authenticated
+  USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "weekly_recaps self insert" ON public.weekly_recaps;
+CREATE POLICY "weekly_recaps self insert" ON public.weekly_recaps
+  FOR INSERT TO authenticated
+  WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "weekly_recaps self update" ON public.weekly_recaps;
+CREATE POLICY "weekly_recaps self update" ON public.weekly_recaps
+  FOR UPDATE TO authenticated
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
