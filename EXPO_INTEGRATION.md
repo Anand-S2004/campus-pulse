@@ -20,9 +20,9 @@ This file is everything you need to wire the Expo app to this backend.
 **Env vars to put in your Expo app (`app.config.ts` → `extra`):**
 
 ```
-SUPABASE_URL=https://mtqyrbyudtduyoqtumlt.supabase.co
-SUPABASE_ANON_KEY=eyJhbGciOi...   # the publishable key in .env at the repo root
-BACKEND_URL=https://project--a47d5318-90cc-49fa-a067-99b4350c777a.lovable.app
+SUPABASE_URL=https://zmjkkasiihycuutikims.supabase.co
+SUPABASE_ANON_KEY=sb_publishable_... # the publishable key in .env at the repo root
+BACKEND_URL=https://your-repl-name.replit.dev # update after deploying this Lovable project
 ```
 
 ---

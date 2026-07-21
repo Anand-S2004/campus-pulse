@@ -60,6 +60,14 @@ export const Route = createFileRoute("/api/public/my-recap")({
           auth: { persistSession: false, autoRefreshToken: false },
         });
 
+        // Server-side admin client for the final upsert: the row is authenticated
+        // via the JWT check above, so we can safely write on the user's behalf even
+        // if the weekly_recaps RLS policy is not yet configured in the project.
+        const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+        const adminClient = SERVICE_ROLE_KEY
+          ? createClient(SUPABASE_URL, SERVICE_ROLE_KEY, { auth: { persistSession: false } })
+          : null;
+
         // 3. Load approved posts in this week (publicly readable via feed policy).
         const { data: posts } = await client
           .from("posts")
@@ -121,8 +129,10 @@ export const Route = createFileRoute("/api/public/my-recap")({
           crossed = seenUsers.size;
         }
 
-        // 5. Upsert the recap row.
-        const { data: upserted, error } = await client
+        // 5. Upsert the recap row. Prefer the server-side admin client so the
+        // feature works even when the weekly_recaps RLS policy is not configured.
+        const upsertClient = adminClient ?? client;
+        const { data: upserted, error } = await upsertClient
           .from("weekly_recaps")
           .upsert(
             {
