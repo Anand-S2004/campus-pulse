@@ -67,8 +67,14 @@ export const Route = createFileRoute("/api/public/ingest-location")({
         }
 
         // 3. Load zones with anon client (campus_zones is publicly readable).
+        //    Node 20 has no native WebSocket — pass the `ws` package as transport
+        //    so the Supabase realtime client doesn't throw on client creation.
         const { createClient } = await import("@supabase/supabase-js");
-        const anonClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        const ws = (await import("ws")).default;
+        const wsTransport = ws as unknown as typeof WebSocket;
+        const anonClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+          realtime: { transport: wsTransport },
+        });
         const { data: zones } = await anonClient
           .from("campus_zones")
           .select("id, name, center_lat, center_lon, radius_m");
@@ -92,6 +98,7 @@ export const Route = createFileRoute("/api/public/ingest-location")({
         const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
           global: { headers: { Authorization: `Bearer ${token}` } },
           auth: { persistSession: false, autoRefreshToken: false },
+          realtime: { transport: wsTransport },
         });
 
         await userClient

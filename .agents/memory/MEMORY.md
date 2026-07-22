@@ -1,4 +1,5 @@
 - [Campus Pulse goals](campus-pulse-goals.md) — mobile-first; all features (location, posts, feed, approvals, recap, push notifications) must work; `SUPABASE_SERVICE_ROLE_KEY` missing from `.env`; mobile folder is `heartbits/`.
+- [Campus Pulse setup](campus-pulse-setup.md) — active project is `zmjkkasiihycuutikims`; `.env` is stale (wrong project); two bugs fixed: setState-during-render in AuthedLayout, missing ws transport in ingest-location.
 - [Expo Router tab hiding](expo-router-tab-hiding.md) — keep tab screens registered and hide buttons with `tabBarButton: () => null`; conditional `Tabs.Screen` mounting breaks route stability and throws at runtime.
 - [Supabase embedded relation selects](supabase-embedded-relations.md) — foreign-table selects like `profiles(...)` return arrays, not a single object; normalize `[0]` before using in UI types.
 - [Hosted Supabase DDL access](hosted-supabase-ddl-access.md) — REST/service-role keys can't run DDL on external Supabase; write migration SQL to repo and ask user to run it via SQL Editor.
