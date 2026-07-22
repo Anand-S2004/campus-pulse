@@ -1,6 +1,7 @@
 // Pathless layout protecting all routes under /_authenticated/*.
 // Redirects to /auth if no session. Renders top nav + location tracking banner.
 import { createFileRoute, Link, Outlet, useNavigate } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { useAuth } from "@/lib/use-auth";
 import { useLocation } from "@/lib/use-location";
 import { supabase } from "@/integrations/supabase/client";
@@ -18,11 +19,13 @@ function AuthedLayout() {
   const nav = useNavigate();
   const { status, currentZone, locationError, lastPing, startTracking, stopTracking } = useLocation();
 
-  if (loading) return <div className="p-8 text-muted-foreground">Loading…</div>;
-  if (!user) {
-    nav({ to: "/auth", replace: true });
-    return null;
-  }
+  useEffect(() => {
+    if (!loading && !user) {
+      nav({ to: "/auth", replace: true });
+    }
+  }, [loading, user, nav]);
+
+  if (loading || !user) return <div className="p-8 text-muted-foreground">Loading…</div>;
 
   return (
     <div className="min-h-screen bg-background">
