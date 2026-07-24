@@ -8,7 +8,8 @@ export const Route = createFileRoute("/api/public/cron/notify-approvals")({
     handlers: {
       POST: async ({ request }) => {
         const apikey = request.headers.get("apikey");
-        if (!apikey) return new Response("Forbidden", { status: 403 });
+        const expected = process.env.CRON_SECRET;
+        if (!apikey || !expected || apikey !== expected) return new Response("Forbidden", { status: 403 });
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         const since = new Date(Date.now() - 6 * 60 * 1000).toISOString();
