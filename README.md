@@ -1,110 +1,61 @@
-# Campus Pulse — What This Project Actually Is
+# Campus Pulse
+
+A campus social platform for BITS Pilani Hyderabad — moderated community moments, anonymous location zone tracking, daily Pulse cards, weekly recaps, and push notifications.
 
 ---
 
-## 🖥️ Run on Replit (Quick Start)
+## Project layout
 
-This project has two parts: the **web admin dashboard** and the **student mobile app**.
-Both can run simultaneously in Replit.
-
-### 1. Install dependencies
-
-```bash
-bun install          # web admin dependencies
-bun install          # mobile app dependencies (run inside mobile/)
 ```
-
-From the root of the project, you can also run:
-
-```bash
-cd mobile && bun install
+/                    Web admin (TanStack Start + React + Vite)
+  src/
+    routes/            Pages and API routes
+    routes/api/public/ Public HTTP endpoints used by the mobile app
+    lib/               Shared utilities
+    components/        UI components
+  supabase/
+    migrations/        Database migrations (apply via Supabase SQL Editor)
+    setup-pg-cron.sql  pg_cron schedule statements (run once in SQL Editor)
+  heartbits/           Expo mobile app
+    app/               expo-router pages
+    src/               hooks, lib, services, providers
 ```
-
-### 2. Start the web admin dashboard
-
-```bash
-bun run dev
-# → http://localhost:5000
-```
-
-This is already configured as the **Start application** workflow.
-
-### 3. Start the Expo mobile app
-
-```bash
-cd mobile
-BROWSER=none bun run start -- --port 8080
-```
-
-This is already configured as the **Start Frontend** workflow. It will print a QR code in the console. Scan it with the **Expo Go** app on your phone, or open `http://localhost:8080` in your browser to use the web version.
-
-### Run both at once
-
-Use the **Project** workflow (or press Run in the Replit toolbar). It starts both servers in parallel.
 
 ---
 
-## 📱 Local Expo Mobile App Development
+## 🖥️ Run on Replit
 
-If you are developing the mobile app locally (not on Replit):
+This project runs as two parallel workflows. Press **Run** (or start the **Project** workflow) to launch both.
+
+| App | Workflow | Port |
+|-----|----------|------|
+| Web admin dashboard | `Start application` | 5000 |
+| Expo mobile (web + QR) | `Start Frontend` | 8080 |
+
+### First-time setup
 
 ```bash
-cd mobile
+# Install web admin dependencies
 bun install
-bun run start
-# scan the QR code with Expo Go
+
+# Install mobile app dependencies
+cd heartbits && bun install
 ```
 
-The Expo dev server normally runs on port **8081**. On Replit it is configured to run on **8080** to avoid conflicts with the web admin dashboard.
+### Required secrets
 
-### Mobile app environment variables
+Set these in Replit → Secrets before starting:
 
-The mobile app reads these values from `app.json` under `expo.extra`:
+| Secret | Where to find it |
+|--------|-----------------|
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase dashboard → Settings → API → service_role key |
+| `CRON_SECRET` | Any long random string you choose |
 
-| Variable | Description |
-|---|---|
-| `SUPABASE_URL` | Supabase project URL |
-| `SUPABASE_ANON_KEY` | Supabase public/anon key |
-| `BACKEND_URL` | Replit backend URL for the custom HTTP API |
+The public env vars (`SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `VITE_*`, `EXPO_PUBLIC_*`) are already configured in the Replit environment.
 
-You can also override them by setting `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, and `EXPO_PUBLIC_BACKEND_URL` in your shell environment.
+### Sign up & become admin
 
----
-
-## 🌐 Local Web Admin Development
-
-```bash
-git clone https://github.com/Anand-S2004/campus-pulse.git
-cd campus-pulse
-bun install
-```
-
-### Set up environment variables
-
-```bash
-cp .env.example .env
-```
-
-Open `.env` and fill in **all four values** from your Supabase dashboard (**Settings → API**):
-
-| Variable | Where to find it |
-|---|---|
-| `SUPABASE_URL` / `VITE_SUPABASE_URL` | Settings → API → Project URL |
-| `SUPABASE_PUBLISHABLE_KEY` / `VITE_SUPABASE_PUBLISHABLE_KEY` | Settings → API → `anon` / `public` key |
-| `SUPABASE_SERVICE_ROLE_KEY` | Settings → API → `service_role` key ⚠️ keep secret |
-
-> **"Invalid API key" error?** The most common cause is a missing or wrong `SUPABASE_SERVICE_ROLE_KEY`. The signup endpoint runs server-side and needs this key to create users — the anon key alone is not enough.
-
-### Run the dev server
-
-```bash
-bun run dev
-# → http://localhost:5000
-```
-
-### Sign up & promote yourself to admin
-
-1. Go to `http://localhost:5000/auth`
+1. Open the web admin at port 5000 → `/auth`
 2. Sign up with a `@hyderabad.bits-pilani.ac.in` email
 3. Promote yourself in Supabase SQL Editor:
 
@@ -113,258 +64,163 @@ INSERT INTO public.user_roles (user_id, role)
 SELECT id, 'admin' FROM auth.users WHERE email = 'you@hyderabad.bits-pilani.ac.in';
 ```
 
-### Production build
+---
+
+## 🔁 pg_cron setup (one-time)
+
+The cron jobs are **not** self-registering — you must schedule them once in the Supabase SQL Editor.
+
+**`supabase/setup-pg-cron.sql`** contains the ready-to-run statements with the current Replit dev domain already filled in. Steps:
+
+1. **Enable extensions** in Supabase dashboard → Database → Extensions → enable `pg_cron` and `pg_net`
+2. Open **SQL Editor** for project `zmjkkasiihycuutikims`
+3. Paste the contents of `supabase/setup-pg-cron.sql`
+4. Replace `YOUR_CRON_SECRET` with your `CRON_SECRET` secret value
+5. Run — then verify with:
+
+```sql
+SELECT jobid, jobname, schedule, active FROM cron.job;
+```
+
+| Job | Schedule | What it does |
+|-----|----------|-------------|
+| `notify-approvals` | Every 5 min | Pushes "your post is live" to authors |
+| `generate-pulse` | Daily 08:00 UTC | Creates Community Pulse cards |
+| `generate-recap` | Mondays 09:00 UTC | Generates weekly recaps + push notifications |
+
+> ⚠️ **Domain changes:** The Replit dev domain can change when the repl restarts. If cron jobs stop firing, update `supabase/setup-pg-cron.sql` with the new domain, run `cron.unschedule()` for each job, then re-run the schedule statements.
+
+---
+
+## 🌐 Local development (off Replit)
 
 ```bash
-bun run build    # SSR build → dist/
-bun run preview  # preview the built output locally
-```
-
----
-
-## 1. What this project IS
-
-This Lovable project is the **web admin dashboard + shared Supabase backend**
-for Campus Pulse. It is intentionally **not** the student-facing app.
-
-You picked this split yourself earlier in the conversation:
-
-> "Build a web admin + backend, you do Expo separately"
-
-So this repo contains two things:
-
-1. A **web app** for moderators / admins (built with TanStack Start + React).
-2. A **Supabase backend** (Postgres tables, RLS, cron jobs, public HTTP
-   endpoints under `src/routes/api/public/`).
-
-The student-facing mobile app is in the `mobile/` directory and is built with **Expo + React Native**.
-
-## 2. How the mobile app talks to this backend
-
-See `EXPO_INTEGRATION.md` for full API documentation.
-
-Short version:
-
-- The mobile app uses `@supabase/supabase-js` directly for auth, posts, feed, reactions, and weekly recaps.
-- It also calls the custom backend at `BACKEND_URL` for:
-  - `/api/public/auth/signup` — college-email-gated signup
-  - `/api/public/ingest-location` — zone matching without storing raw GPS
-  - `/api/public/register-push-token` — push token registration
-
-## 3. Tech stack
-
-| Layer | Technology |
-|---|---|
-| Web admin | TanStack Start, React 19, Vite 7, Tailwind CSS v4, shadcn/ui |
-| Mobile app | Expo SDK 57, React Native 0.86, expo-router |
-| Database / Auth | Supabase (Postgres + RLS) |
-| Runtime | Bun |
-
-## 4. Project layout
-
-```
-/                  web admin (TanStack Start)
-  src/
-    routes/          pages and API routes
-    lib/             utilities
-    components/      UI components
-  supabase/          migrations and SQL
-  mobile/            Expo mobile app
-    app/             expo-router pages
-    src/             hooks, lib, services, providers
-```
-
-## 5. Common issues on Replit
-
-### "ENOSPC: System limit for number of file watchers reached"
-
-Both Vite (web admin) and Metro (Expo) need file watchers. The kernel limit on this container is too small for both to watch everything. We fixed this by telling Vite to ignore the `mobile/` directory in its file watcher. If you still see this error, restart both workflows so the change is picked up.
-
-### Expo QR code doesn't appear
-
-The Expo dev server needs to start without trying to open a browser. On Replit, the workflow runs:
-
-```bash
-cd mobile && BROWSER=none bun run start -- --port 8080
-```
-
-The `BROWSER=none` flag prevents it from trying to open a browser in a headless environment, so the QR code prints in the workflow console instead.
-
-### "Invalid API key" on mobile signup
-
-Make sure `mobile/app.json` → `extra.SUPABASE_ANON_KEY` is the **anon** key from your Supabase project (not the service role key). The backend service role key is only used on the server side.
-
----
-
-Read this **first**. There has been confusion about what was built vs. what
-still needs to be built. This file is the honest map.
-
----
-
-# What this project IS
-
-This Lovable project is the **web admin dashboard + shared Supabase backend**
-for Campus Pulse. It is intentionally **not** the student-facing app.
-
-You picked this split yourself earlier in the conversation:
-
-> "Build a web admin + backend, you do Expo separately"
-
-So this repo contains two things:
-
-1. A **web app** for moderators / admins (built with TanStack Start + React).
-2. A **Supabase backend** (Postgres tables, RLS, cron jobs, public HTTP
-   endpoints).
-
-The student-facing mobile app is built separately in **Expo + React Native**.
-
----
-
-# What this project is NOT
-
-- It is **not** the mobile app. That is the Expo project in `mobile/`.
-
----
-
-# Live URLs (if you publish this Lovable project)
-
-| Environment | URL |
-|---|---|
-| Production | `https://project--a47d5318-90cc-49fa-a067-99b4350c777a.lovable.app` |
-| Development | `https://project--a47d5318-90cc-49fa-a067-99b4350c777a-dev.lovable.app` |
-
-On Replit, the running backend URL is shown in the preview pane port selector.
-
----
-
-# The Web Admin
-
-## Purpose
-
-Moderators and admins use the web app to:
-
-- Approve / reject student posts
-- Manage campus zones
-- View weekly recaps and community stats
-- Oversee users and roles
-
-## Tech Stack
-
-- **Framework:** TanStack Start (React, SSR, Vite)
-- **Styling:** Tailwind CSS v4 + shadcn/ui
-- **Auth:** Supabase Auth (email/password, college email gated)
-- **Database:** Supabase Postgres with RLS
-
-## Web Routes
-
-| Route | Purpose |
-|---|---|
-| `/` | Feed (authenticated) |
-| `/auth` | Sign in / sign up |
-| `/moderate` | Post approval queue |
-| `/zones` | Admin zone CRUD |
-| `/recap` | Weekly recap |
-| `/api/public/*` | Public HTTP endpoints used by the mobile app |
-
----
-
-# The Mobile App (Expo)
-
-See the `mobile/` directory and `EXPO_INTEGRATION.md` for the full API guide.
-
-## Mobile app setup
-
-```bash
-cd mobile
+git clone https://github.com/Anand-S2004/campus-pulse.git
+cd campus-pulse
+cp .env.example .env
+# fill in SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, SUPABASE_SERVICE_ROLE_KEY
 bun install
-bun run start
-# scan the QR code with Expo Go
+bun run dev   # → http://localhost:5000
 ```
 
-On Replit, the mobile app is configured to run on port **8080** and prints a QR code in the **Start Frontend** workflow console.
+For the mobile app:
 
-## Mobile App Responsibilities
-
-- Student auth (email/password, college email gated)
-- Submit posts (max 2/week, goes to pending approval)
-- Heart / react to posts
-- View daily Community Pulse and weekly recap
-- Background location tracking for anonymous zone matching
-- Push notifications
+```bash
+cd heartbits
+bun install
+bun run start   # scan QR with Expo Go
+```
 
 ---
 
-# The Supabase Backend
+## 🗄️ Supabase backend
 
-## Database Tables
+### Database tables
 
 ```
 profiles          one per auth user (college email enforced by CHECK)
 user_roles        admin | moderator | student
 campus_zones      circular zones (name, center_lat, center_lon, radius_m)
-posts             user_id, category, location_label, description, status, ...
+posts             user_id, category, location_label, description, status, …
 reactions         (post_id, user_id) — single ❤️
 location_events   zone_id + occurred_at ONLY (raw GPS never stored)
-pulse_cards       auto-generated daily "Community Pulse" snippets
+pulse_cards       auto-generated daily Community Pulse snippets
 weekly_recaps     per-user, per-week stats card
 push_tokens       Expo push tokens
 ```
 
-## Public API Endpoints
+### Public API endpoints
 
 Located in `src/routes/api/public/`:
 
-| Endpoint | Purpose |
-|---|---|
-| `/api/public/auth/signup` | College-email-gated signup, creates profile, assigns `student` role |
-| `/api/public/ingest-location` | Receives raw GPS, matches to campus zone, stores only zone_id + timestamp |
-| `/api/public/register-push-token` | Registers Expo push token |
-| `/api/public/cron/generate-pulse` | Generates daily pulse cards (called by pg_cron) |
-| `/api/public/cron/generate-recap` | Generates weekly recap (Monday) |
-| `/api/public/cron/notify-approvals` | Every 5 min: pushes approved post notifications |
-| `/api/public/cron/push-recaps` | Sub-route: pushes recap notifications |
+| Endpoint | Auth | Purpose |
+|----------|------|---------|
+| `/api/public/auth/signup` | none | College-email-gated signup; creates profile + assigns `student` role |
+| `/api/public/ingest-location` | bearer token | Receives raw GPS, matches to campus zone, stores only zone_id + timestamp |
+| `/api/public/register-push-token` | bearer token | Registers Expo push token |
+| `/api/public/cron/generate-pulse` | `apikey` header (CRON_SECRET) | Generates daily Pulse cards |
+| `/api/public/cron/generate-recap` | `apikey` header (CRON_SECRET) | Generates weekly recaps |
+| `/api/public/cron/notify-approvals` | `apikey` header (CRON_SECRET) | Pushes approval notifications |
+| `/api/public/cron/push-recaps` | `apikey` header (CRON_SECRET) | Sub-route: sends recap push notifications |
 
-## Cron Jobs
-
-Already scheduled via `pg_cron`:
-
-- **Every 5 minutes:** push newly approved post notifications
-- **Daily:** generate Community Pulse cards
-- **Every Monday:** generate weekly recaps and push notifications
+See `EXPO_INTEGRATION.md` for the full mobile API guide.
 
 ---
 
-# Authentication
+## 🔐 Authentication
 
-## College Email Domain
+### College email domain
 
 Default: `@hyderabad.bits-pilani.ac.in`
 
-To change it, edit:
-1. `src/lib/college.ts` → `COLLEGE_EMAIL_DOMAIN`
-2. Run a migration to update the `profiles.college_email_only` CHECK constraint regex.
+To change it:
+1. Edit `src/lib/college.ts` → `COLLEGE_EMAIL_DOMAIN`
+2. Run a migration to update the `profiles.college_email_only` CHECK constraint regex
 
-## Role Assignment
-
-Make someone an admin or moderator from Supabase SQL Editor:
+### Role assignment
 
 ```sql
+-- Make someone an admin
 INSERT INTO public.user_roles (user_id, role)
 SELECT id, 'admin' FROM auth.users WHERE email = 'you@hyderabad.bits-pilani.ac.in';
-```
 
-Replace `'admin'` with `'moderator'` for moderation-only access.
+-- Make someone a moderator
+INSERT INTO public.user_roles (user_id, role)
+SELECT id, 'moderator' FROM auth.users WHERE email = 'mod@hyderabad.bits-pilani.ac.in';
+```
 
 ---
 
-# Weekly Recap Design Rule
+## 🖥️ Web admin routes
+
+| Route | Purpose |
+|-------|---------|
+| `/` | Feed (authenticated) |
+| `/auth` | Sign in / sign up |
+| `/moderate` | Post approval queue |
+| `/zones` | Admin zone CRUD |
+| `/recap` | Weekly recap viewer |
+
+---
+
+## 📱 Mobile app (heartbits/)
+
+The student-facing Expo app handles:
+- Auth (college email gated)
+- Submitting posts (max 2/week; goes to pending approval)
+- Reacting to posts (❤️)
+- Viewing daily Community Pulse and weekly personal recap
+- Background location tracking (zone matching only — raw GPS never leaves the device)
+- Push notifications
+
+### Mobile env vars
+
+Set in Replit environment (shared):
+
+| Variable | Purpose |
+|----------|---------|
+| `EXPO_PUBLIC_SUPABASE_URL` | Supabase project URL |
+| `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon/public key |
+| `EXPO_PUBLIC_BACKEND_URL` | Web admin backend URL (Replit dev domain) |
+
+---
+
+## 🧱 Tech stack
+
+| Layer | Technology |
+|-------|-----------|
+| Web admin | TanStack Start, React 19, Vite 7, Tailwind CSS v4, shadcn/ui |
+| Mobile app | Expo SDK 57, React Native 0.86, expo-router |
+| Database / Auth | Supabase (Postgres + RLS + Auth) |
+| Runtime | Bun |
+| Cron | pg_cron + pg_net inside Supabase |
+
+---
+
+## 🔁 Weekly recap design rule
 
 Every recap card should answer one question:
 
-> "How can this statistic reinforce togetherness?"
+> "How does this statistic reinforce togetherness?"
 
-If a statistic only reports activity but does not strengthen belonging, it should not appear in the recap.
-
-The recap is not a dashboard. It is a reminder that students are part of a larger community.
-
----
+If a stat only reports activity without strengthening belonging, it doesn't belong in the recap. The recap is a reminder that students are part of a larger community — not a personal dashboard.
