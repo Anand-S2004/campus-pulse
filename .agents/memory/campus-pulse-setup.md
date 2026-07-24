@@ -1,33 +1,27 @@
 ---
-name: Campus Pulse — Working Setup
-description: Final verified working configuration for Campus Pulse on Replit (Supabase project, env vars, known fixes).
+name: Campus Pulse setup
+description: Active Supabase project, env var layout, stale .env situation, and how to get the project running.
 ---
 
-# Campus Pulse — Working Setup
+# Campus Pulse Setup
 
 ## Active Supabase project
-`zmjkkasiihycuutikims` — this matches the service role key the user has, and is stated as active in replit.md.
+`zmjkkasiihycuutikims` — https://zmjkkasiihycuutikims.supabase.co
 
-**The `.env` file in the repo is stale** (points to a different project `mtqyrbyudtduyoqtumlt`). Replit env vars override `.env`, so all real credentials are set as Replit environment variables.
+## Environment variable layout
+- Non-secret vars (`SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `VITE_*`, `EXPO_PUBLIC_*`) are set in `.replit` under `[userenv.shared]`.
+- Secrets (`SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET`) are Replit Secrets.
+- The `.env` file in the repo root is stale (points to old project `mtqyrbyudtduyoqtumlt`) and cannot be edited via agent tools. Bun does NOT override existing `process.env` values with `.env`, so the Replit env vars win at runtime.
 
-## Environment
-- All Supabase vars set as Replit shared env vars (not `.env` file): `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_BACKEND_URL`
-- Secrets: `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET`
-- Mobile BACKEND_URL: `https://6b387340-0efc-40fb-aafc-c46708c89e03-00-1327hnc5xtsxn.pike.replit.dev`
+## How to run
+- Web admin: `bun run dev` → port 5000 (`Start application` workflow)
+- Mobile (web mode): `cd heartbits && BROWSER=none bun run start -- --port 8080` → port 8080 (`Start Frontend` workflow)
+- Dependencies must be installed first: `bun install` at root and `cd heartbits && bun install`
 
-## Bug fixes applied
-- `src/routes/_authenticated/route.tsx`: Moved `nav()` call into `useEffect` to fix "setState during render" React warning (Transitioner/AuthedLayout)
-- `src/routes/api/public/ingest-location.ts`: Added `ws` package as transport to both inline `createClient` calls — Node 20 has no native WebSocket, causing crash without it
+## Known non-fatal error on Expo start
+`libglib-2.0.so.0: cannot open shared object file` — this is the optional React Native DevTools debugger shell failing to load. Metro bundler still starts and serves normally.
 
-## Feature verification results (all passing)
-- Signup via `/api/public/auth/signup` ✅
-- Post creation via `/api/public/create-post` ✅
-- Location ingestion: in-zone → `{matched:true, zone_name}`, off-campus → `{matched:false}` ✅
-- Cron generate-pulse ✅
-- Cron notify-approvals ✅
-- Cron generate-recap ✅
-- Both workflows running: web (5000), Expo mobile (8080) ✅
+**Why:** The NixOS container doesn't have glib. This is a cosmetic error; ignore it.
 
-**Why:** Future work needs to know which project is active and what env strategy is used. The .env file confusion caused significant debugging time.
-
-**How to apply:** If the SUPABASE_SERVICE_ROLE_KEY stops working, decode its JWT payload (middle segment, base64) and confirm `ref` matches `zmjkkasiihycuutikims`.
+## Expo QR code limitation
+Metro prints an internal IP (172.x.x.x) that is unreachable from a phone. To test on a real device, the start command needs `--tunnel` or `--host` set to the Replit dev domain.
