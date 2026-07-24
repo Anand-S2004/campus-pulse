@@ -17,7 +17,7 @@ export const SUPABASE_ANON_KEY = readConfigValue(
 );
 export const BACKEND_URL = readConfigValue(
   'EXPO_PUBLIC_BACKEND_URL',
-  'https://6b387340-0efc-40fb-aafc-c46708c89e03-00-1327hnc5xtsxn.pike.replit.dev',
+  'https://ade93772-c283-47d4-867a-e40418939d7a-00-tfg0zlls6q38.janeway.replit.dev',
   'BACKEND_URL',
 );
 export const AUTH_REDIRECT_URL = Linking.createURL('/');

@@ -1,4 +1,4 @@
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { PostItem } from '../types';
 
@@ -23,10 +23,24 @@ export function PostCard({ item, onToggleReaction, reactionBusy }: PostCardProps
 
       <Text style={styles.body}>{item.description}</Text>
 
+      {item.photo_url ? (
+        <Image
+          source={{ uri: item.photo_url }}
+          style={styles.postImage}
+          resizeMode="cover"
+        />
+      ) : null}
+
       <View style={styles.footerRow}>
         <Text style={styles.timestamp}>{new Date(item.created_at).toLocaleDateString()}</Text>
         <Pressable onPress={() => onToggleReaction(item.id)} style={styles.reactionButton}>
-          {reactionBusy ? <ActivityIndicator size="small" color="#2456f5" /> : <Text style={styles.reactionText}>{item.userReacted ? '💛' : '🤍'} {item.reactionCount}</Text>}
+          {reactionBusy ? (
+            <ActivityIndicator size="small" color="#2456f5" />
+          ) : (
+            <Text style={styles.reactionText}>
+              {item.userReacted ? '💛' : '🤍'} {item.reactionCount}
+            </Text>
+          )}
         </Pressable>
       </View>
     </View>
@@ -76,6 +90,12 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22,
     color: '#1f2937',
+    marginTop: 12,
+  },
+  postImage: {
+    width: '100%',
+    height: 200,
+    borderRadius: 12,
     marginTop: 12,
   },
   footerRow: {

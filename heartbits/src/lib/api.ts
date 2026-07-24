@@ -47,7 +47,7 @@ async function getReactionSummary(postId: string) {
 export async function fetchFeedPage(page = 0, limit = 10): Promise<FeedPage> {
   const { data: posts, error } = await supabase
     .from('posts')
-    .select('id, category, location_label, description, created_at, user_id')
+    .select('id, category, location_label, description, photo_url, created_at, user_id')
     .eq('status', 'approved')
     .order('created_at', { ascending: false })
     .range(page * limit, page * limit + limit - 1);
@@ -75,6 +75,7 @@ export async function fetchFeedPage(page = 0, limit = 10): Promise<FeedPage> {
         category: row.category as PostCategory,
         location_label: row.location_label,
         description: row.description ?? '',
+        photo_url: row.photo_url ?? null,
         created_at: row.created_at,
         user_id: row.user_id,
         authorName: profileRow?.display_name ?? 'Campus friend',
@@ -101,7 +102,45 @@ export async function fetchFeedPage(page = 0, limit = 10): Promise<FeedPage> {
   };
 }
 
-export async function createPost(input: { description: string; locationLabel: string; category: PostCategory }) {
+export async function createPost(input: {
+  description: string;
+  locationLabel: string;
+  category: PostCategory;
+  imageUri?: string | null;
+}) {
+  // Upload image to Supabase Storage first (if provided).
+  let photoUrl: string | null = null;
+  if (input.imageUri) {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) throw new Error('Please sign in before sharing.');
+
+    const ext = input.imageUri.split('.').pop()?.split('?')[0]?.toLowerCase() ?? 'jpg';
+    const safeExt = ['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(ext) ? ext : 'jpg';
+    const fileName = `${session.user.id}/${Date.now()}.${safeExt}`;
+
+    // Fetch the image as a blob (works on both native and web).
+    const imgResponse = await fetch(input.imageUri);
+    const blob = await imgResponse.blob();
+
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('post-photos')
+      .upload(fileName, blob, {
+        contentType: blob.type || 'image/jpeg',
+        upsert: false,
+      });
+
+    if (uploadError) {
+      throw new Error('Could not upload photo. Please try again.');
+    }
+
+    const {
+      data: { publicUrl },
+    } = supabase.storage.from('post-photos').getPublicUrl(uploadData.path);
+    photoUrl = publicUrl;
+  }
+
   // Use the server-side /api/public/create-post endpoint instead of a direct Supabase
   // insert. Several users were hitting the cryptic "new row violates row-level security
   // policy for table \"posts\"" error even after the mobile client set status='pending'.
@@ -116,6 +155,7 @@ export async function createPost(input: { description: string; locationLabel: st
       description: input.description,
       locationLabel: input.locationLabel || 'Campus community',
       category: input.category,
+      photoUrl,
     }),
   });
 
@@ -132,17 +172,24 @@ export async function createPost(input: { description: string; locationLabel: st
 }
 
 export async function resetMyFeed() {
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-  if (userError || !user) {
-    throw new Error('Please sign in before clearing the feed.');
-  }
+  // Route through the backend service-role endpoint so the delete succeeds
+  // regardless of whether the "posts self delete" RLS policy is in place.
+  const headers = await getAuthHeaders();
+  const response = await fetch(`${BACKEND_URL}/api/public/reset-feed`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({}),
+  });
 
-  const { error } = await supabase.from('posts').delete().eq('user_id', user.id);
-  if (error) {
-    throw error;
+  if (!response.ok) {
+    let message = 'Please try again.';
+    try {
+      const payload = (await response.json()) as { error?: string };
+      if (payload.error) message = payload.error;
+    } catch {
+      // ignore parse failure
+    }
+    throw new Error(message);
   }
 }
 

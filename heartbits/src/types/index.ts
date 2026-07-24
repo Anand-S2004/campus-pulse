@@ -9,6 +9,7 @@ export interface PostItem {
   category: PostCategory;
   location_label: string;
   description: string | null;
+  photo_url: string | null;
   created_at: string;
   user_id: string;
   authorName: string;

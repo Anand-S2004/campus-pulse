@@ -49,6 +49,9 @@ export const Route = createFileRoute("/api/public/create-post")({
           (body as { locationLabel?: unknown })?.locationLabel ?? "Campus community",
         ).trim();
         const category = String((body as { category?: unknown })?.category ?? "other").trim();
+        const photoUrlRaw = (body as { photoUrl?: unknown })?.photoUrl;
+        const photoUrl =
+          typeof photoUrlRaw === "string" && photoUrlRaw.trim() ? photoUrlRaw.trim() : null;
 
         if (description.length < 1 || description.length > 280) {
           return Response.json(
@@ -86,6 +89,7 @@ export const Route = createFileRoute("/api/public/create-post")({
           location_label: locationLabel,
           category,
           status: "pending",
+          ...(photoUrl ? { photo_url: photoUrl } : {}),
         });
 
         if (insertErr) {

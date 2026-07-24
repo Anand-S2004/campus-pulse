@@ -28,8 +28,14 @@ export async function requestLocationPermissions() {
     return { foregroundGranted: false, backgroundGranted: false, enabled: false };
   }
 
-  const background = await Location.requestBackgroundPermissionsAsync();
-  const backgroundGranted = background.status === 'granted';
+  // Background permissions are not available on Expo web or some simulators.
+  let backgroundGranted = false;
+  try {
+    const background = await Location.requestBackgroundPermissionsAsync();
+    backgroundGranted = background.status === 'granted';
+  } catch {
+    // Non-fatal: web and some environments don't support background permissions.
+  }
 
   return {
     foregroundGranted: true,
@@ -40,26 +46,42 @@ export async function requestLocationPermissions() {
 
 export async function startBackgroundLocationTracking() {
   const permissions = await requestLocationPermissions();
+
   if (!permissions.foregroundGranted) {
     return permissions;
   }
 
-  if (!permissions.backgroundGranted) {
-    return permissions;
+  if (permissions.backgroundGranted) {
+    try {
+      await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
+        accuracy: Location.Accuracy.Balanced,
+        timeInterval: 5 * 60 * 1000,
+        distanceInterval: 25,
+        foregroundService: {
+          notificationTitle: 'Campus Pulse',
+          notificationBody: 'Keeping your campus zone updated quietly.',
+        },
+        pausesUpdatesAutomatically: true,
+      });
+      return { ...permissions, enabled: true };
+    } catch {
+      // Background tasks are not supported on Expo web or some simulators.
+      // Fall through to the one-time ping below.
+    }
   }
 
-  await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
-    accuracy: Location.Accuracy.Balanced,
-    timeInterval: 5 * 60 * 1000,
-    distanceInterval: 25,
-    foregroundService: {
-      notificationTitle: 'Campus Pulse',
-      notificationBody: 'Keeping your campus zone updated quietly.',
-    },
-    pausesUpdatesAutomatically: true,
-  });
+  // Foreground is granted but background tracking couldn't start.
+  // Send a single location ping now so the user's zone is still recorded.
+  try {
+    const pos = await Location.getCurrentPositionAsync({
+      accuracy: Location.Accuracy.Balanced,
+    });
+    await ingestLocation(pos.coords.latitude, pos.coords.longitude);
+  } catch {
+    // Silently ignore — the user is still in the app, location is best-effort.
+  }
 
-  return { ...permissions, enabled: true };
+  return { ...permissions, enabled: false };
 }
 
 export async function sendCurrentLocationOnce() {

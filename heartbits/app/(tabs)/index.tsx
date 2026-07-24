@@ -32,11 +32,11 @@ export default function FeedScreen() {
         }
 
         if (result.enabled) {
-          setLocationNotice('Location tracking is ready.');
+          setLocationNotice('Zone tracking active.');
         } else if (result.foregroundGranted) {
-          setLocationNotice('Background location access is still off.');
+          setLocationNotice('Zone updated — enable background location for continuous tracking.');
         } else {
-          setLocationNotice('Location permission is required.');
+          setLocationNotice('Grant location permission for zone tracking.');
         }
       } catch {
         if (!cancelled) {

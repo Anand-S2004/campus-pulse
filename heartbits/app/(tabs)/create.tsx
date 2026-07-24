@@ -81,6 +81,7 @@ export default function CreateScreen() {
         description: values.description,
         locationLabel: values.locationLabel,
         category: values.category,
+        imageUri,
       });
       clearInterval(interval);
       setProgress(100);
