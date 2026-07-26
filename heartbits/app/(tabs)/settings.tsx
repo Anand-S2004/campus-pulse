@@ -1,5 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
+import * as Location from 'expo-location';
+import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
@@ -7,7 +9,7 @@ import { Alert, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import { ScreenShell } from '../../src/components/ScreenShell';
 import { useAuth } from '../../src/hooks/use-auth-session';
 import { requestNotificationPermission } from '../../src/services/notifications';
-import { requestLocationPermissions } from '../../src/services/location';
+import { startBackgroundLocationTracking } from '../../src/services/location';
 
 export default function SettingsScreen() {
   const { profile, role, signOut } = useAuth();
@@ -16,10 +18,28 @@ export default function SettingsScreen() {
 
   useEffect(() => {
     const load = async () => {
-      const storedNotifications = await SecureStore.getItemAsync('cp-notify');
-      const storedLocation = await SecureStore.getItemAsync('cp-location');
-      setNotificationsEnabled(storedNotifications === '1');
-      setLocationEnabled(storedLocation === '1');
+      // Check actual OS permission status — SecureStore may be stale if the user
+      // granted permission via the OS prompt or device settings after install.
+      const [locationPerm, notifPerm, storedNotifications, storedLocation] = await Promise.all([
+        Location.getForegroundPermissionsAsync().catch(() => ({ status: 'undetermined' as const })),
+        Notifications.getPermissionsAsync().catch(() => ({ status: 'undetermined' as const })),
+        SecureStore.getItemAsync('cp-notify'),
+        SecureStore.getItemAsync('cp-location'),
+      ]);
+
+      const notifGranted = notifPerm.status === 'granted';
+      const locationGranted = locationPerm.status === 'granted';
+
+      // Sync SecureStore with actual OS state so toggles reflect reality.
+      if (notifGranted && storedNotifications !== '1') {
+        await SecureStore.setItemAsync('cp-notify', '1');
+      }
+      if (locationGranted && storedLocation !== '1') {
+        await SecureStore.setItemAsync('cp-location', '1');
+      }
+
+      setNotificationsEnabled(notifGranted || storedNotifications === '1');
+      setLocationEnabled(locationGranted || storedLocation === '1');
     };
 
     load();
@@ -31,7 +51,9 @@ export default function SettingsScreen() {
     if (value) {
       const granted = await requestNotificationPermission();
       if (!granted) {
-        Alert.alert('Notifications will stay off', 'You can enable them later in your device settings.');
+        setNotificationsEnabled(false);
+        await SecureStore.setItemAsync('cp-notify', '0');
+        Alert.alert('Notifications off', 'You can enable them in your device settings.');
       }
     }
   };
@@ -40,9 +62,18 @@ export default function SettingsScreen() {
     setLocationEnabled(value);
     await SecureStore.setItemAsync('cp-location', value ? '1' : '0');
     if (value) {
-      const permissions = await requestLocationPermissions();
-      if (!permissions.enabled) {
-        Alert.alert('Location is still off', 'Campus Pulse will keep working without background location.');
+      // Start tracking (not just request permission) so the zone is updated immediately.
+      const result = await startBackgroundLocationTracking();
+      if (!result.foregroundGranted) {
+        setLocationEnabled(false);
+        await SecureStore.setItemAsync('cp-location', '0');
+        Alert.alert('Location required', 'Grant location permission in your device settings to enable zone tracking.');
+      } else if (!result.enabled) {
+        // Foreground granted, one-time ping sent — background is optional.
+        Alert.alert(
+          'Zone updated',
+          'Your zone was updated. Enable background location in device settings for continuous tracking.',
+        );
       }
     }
   };
@@ -82,7 +113,7 @@ export default function SettingsScreen() {
 
         <View style={styles.infoBox}>
           <Text style={styles.infoTitle}>Privacy first</Text>
-          <Text style={styles.infoText}>Campus Pulse only sends your location to the backend. The app never shows your exact coordinates or movement history.</Text>
+          <Text style={styles.infoText}>Campus Pulse only stores which zone you're in — never your exact coordinates or movement history.</Text>
         </View>
 
         <Pressable style={styles.secondaryButton} onPress={() => router.push('/debug')}>

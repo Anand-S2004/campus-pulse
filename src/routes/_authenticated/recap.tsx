@@ -45,7 +45,7 @@ function RecapPage() {
     },
   });
 
-  async function refreshRecap() {
+  async function refreshRecap(testMinutes?: number) {
     toast.info("Generating your recap…");
     const {
       data: { session },
@@ -60,7 +60,7 @@ function RecapPage() {
         "content-type": "application/json",
         authorization: `Bearer ${session.access_token}`,
       },
-      body: JSON.stringify({}),
+      body: JSON.stringify(testMinutes ? { testMinutes } : {}),
     });
     if (!res.ok) {
       const text = await res.text().catch(() => "Unknown error");
@@ -75,10 +75,15 @@ function RecapPage() {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">My Week</h2>
-        <Button size="sm" variant="outline" onClick={refreshRecap} className="gap-2">
-          <RefreshCw className="h-4 w-4" />
-          Generate / refresh
-        </Button>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={() => refreshRecap()} className="gap-2">
+            <RefreshCw className="h-4 w-4" />
+            Generate / refresh
+          </Button>
+          <Button size="sm" variant="secondary" onClick={() => refreshRecap(60)} title="Generate recap from last 60 minutes of data (testing)">
+            ⚡ Last 60 min
+          </Button>
+        </div>
       </div>
 
       {recap.isLoading && <div className="text-muted-foreground">Loading recap…</div>}

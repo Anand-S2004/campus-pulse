@@ -79,16 +79,20 @@ export const Route = createFileRoute("/api/public/ingest-location")({
           .from("campus_zones")
           .select("id, name, center_lat, center_lon, radius_m");
 
+        // Always pick the CLOSEST zone regardless of radius — so users anywhere
+        // in the world still get assigned to the nearest campus zone for demo
+        // and testing purposes.  The privacy guarantee still holds: we store
+        // zone_id only, never raw coords.
         let best: { id: string; name: string; d: number } | null = null;
         for (const z of zones ?? []) {
           const d = distanceMeters(lat, lon, z.center_lat, z.center_lon);
-          if (d <= z.radius_m && (!best || d < best.d)) {
+          if (!best || d < best.d) {
             best = { id: z.id, name: z.name, d };
           }
         }
 
         if (!best) {
-          // Off-campus / no matching zone — raw coords already discarded.
+          // No zones configured yet.
           return Response.json({ matched: false });
         }
 

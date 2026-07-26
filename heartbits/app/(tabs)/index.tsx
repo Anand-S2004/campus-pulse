@@ -68,8 +68,9 @@ export default function FeedScreen() {
     setResetBusy(true);
     try {
       await resetMyFeed();
-      queryClient.invalidateQueries({ queryKey: ['feed'] });
-      Alert.alert('Feed reset', 'Your demo posts have been removed.');
+      // Remove all cached pages so the FlatList re-renders from scratch.
+      await queryClient.resetQueries({ queryKey: ['feed'] });
+      Alert.alert('Feed reset', 'Posts have been cleared.');
     } catch (error) {
       Alert.alert('Could not reset feed', error instanceof Error ? error.message : 'Please try again.');
     } finally {
