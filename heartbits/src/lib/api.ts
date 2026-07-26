@@ -121,16 +121,10 @@ export async function createPost(input: {
     const fileName = `${session.user.id}/${Date.now()}.${safeExt}`;
 
     // React Native does not support creating Blob from ArrayBuffer/fetch response.
-    // Use expo-file-system to read as base64, then decode to Uint8Array for upload.
-    const FileSystem = await import('expo-file-system');
-    const base64 = await FileSystem.readAsStringAsync(input.imageUri, {
-      encoding: FileSystem.EncodingType.Base64,
-    });
-    const binaryStr = atob(base64);
-    const bytes = new Uint8Array(binaryStr.length);
-    for (let i = 0; i < binaryStr.length; i++) {
-      bytes[i] = binaryStr.charCodeAt(i);
-    }
+    // Use the new expo-file-system File class which returns a Uint8Array directly.
+    const { File: EFile } = await import('expo-file-system');
+    const file = new EFile(input.imageUri);
+    const bytes = await file.bytes();
 
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from('post-photos')
